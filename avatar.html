@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Izberi avatar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 min-h-screen flex items-center justify-center p-6">
+
+<main class="bg-white/80 backdrop-blur-md p-6 rounded-3xl shadow-xl w-full max-w-lg space-y-6">
+
+    <h1 class="text-2xl font-bold text-center text-gray-800">Izberi svoj avatar</h1>
+
+    <p class="text-center text-gray-600">Klikni na avatar ✨</p>
+
+    <div class="grid grid-cols-2 gap-4" id="avatar-container"></div>
+
+    <button onclick="window.location.href='index.html'"
+            class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg">
+        Nazaj
+    </button>
+
+</main>
+
+<script>
+    // ID igralca
+    const playerId = localStorage.getItem("avatar_select_player");
+
+    if (!playerId) {
+        alert("Napaka: Ni izbranega igralca!");
+        window.location.href = "index.html";
+    }
+
+    // Točke iz Supabase Leaderboard-a
+    let score = 0;
+
+    // Osnovni avatarji
+    const basicAvatars = [
+        { file: "boy1.jpg" },
+        { file: "boy2.jpg" },
+        { file: "girl1.jpg" },
+        { file: "girl2.jpg" }
+    ];
+
+    // Zaklenjeni avatarji
+    const lockedAvatars = [
+        { file: "avatar_gold.jpg", unlockAt: 1000 },
+        { file: "avatar_diamond.jpg", unlockAt: 2000 },
+        { file: "avatar_legend.jpg", unlockAt: 5000 }
+    ];
+
+    const container = document.getElementById("avatar-container");
+
+    // BOX za avatar
+    function createAvatarBox(avatar, locked) {
+        const div = document.createElement("div");
+        div.className =
+            "cursor-pointer border-2 rounded-2xl p-2 bg-white transition hover:scale-105 hover:shadow-lg text-center";
+
+        div.innerHTML = `
+            <img src="images/avatars/${avatar.file}"
+                 class="rounded-xl w-full h-auto ${locked ? 'opacity-40' : ''}">
+            ${locked ? `<p class="text-red-500 text-sm mt-1">🔒 ${avatar.unlockAt} pts</p>` : ""}
+        `;
+
+        if (!locked) {
+            div.onclick = () => {
+                localStorage.setItem("avatar_" + playerId, avatar.file);
+                alert("Avatar izbran! 😊");
+                window.location.href = "index.html";
+            };
+        } else {
+            div.onclick = () => {
+                alert("Ta avatar se odklene pri " + avatar.unlockAt + " točkah! 🔒");
+            };
+        }
+
+        return div;
+    }
+
+    // Rendering avatarjev
+    function renderAvatars() {
+        container.innerHTML = "";
+
+        basicAvatars.forEach(av => container.appendChild(createAvatarBox(av, false)));
+
+        lockedAvatars.forEach(av => {
+            const isLocked = score < av.unlockAt;
+            container.appendChild(createAvatarBox(av, isLocked));
+        });
+    }
+
+    // ⭐ Pridobi total score iz SUPABASE ⭐
+    window.api.getTotalScore(playerId).then(res => {
+        score = res?.total || 0;
+        renderAvatars();
+    });
+
+</script>
+
+</body>
+</html>
