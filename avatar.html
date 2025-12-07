@@ -4,6 +4,51 @@
     <meta charset="UTF-8">
     <title>Izberi avatar</title>
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+    /* DARK THEME */
+
+    body.dark {
+        background: linear-gradient(to bottom right, #0f172a, #1e293b) !important;
+        color: #e5e7eb !important;
+    }
+
+    body.dark main {
+        background-color: #0f172a !important;
+        border: 1px solid #475569 !important;
+        color: #e5e7eb !important;
+    }
+
+    body.dark h1,
+    body.dark p {
+        color: #e5e7eb !important;
+    }
+
+    /* Avatar box */
+    body.dark #avatar-container > div {
+        background-color: #020617 !important;
+        border-color: #475569 !important;
+    }
+
+    body.dark #avatar-container img {
+        background-color: transparent !important;
+    }
+
+    body.dark #avatar-container p {
+        color: #fecaca !important; /* светло црвено за "locked" текстот */
+    }
+
+    /* Back button */
+    body.dark button {
+        background-color: #2563eb !important;
+        color: #e5e7eb !important;
+        border-color: #2563eb !important;
+    }
+
+    body.dark button:hover {
+        background-color: #1d4ed8 !important;
+    }
+    </style>
 </head>
 
 <body class="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 min-h-screen flex items-center justify-center p-6">
@@ -24,6 +69,12 @@
 </main>
 
 <script>
+    // init dark / light theme
+    (function initTheme() {
+        const theme = localStorage.getItem('theme') || 'light';
+        document.body.classList.toggle('dark', theme === 'dark');
+    })();
+
     // ID igralca
     const playerId = localStorage.getItem("avatar_select_player");
 
@@ -96,7 +147,6 @@
         score = res?.total || 0;
         renderAvatars();
     });
-
 </script>
 
 </body>

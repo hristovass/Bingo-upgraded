@@ -5,7 +5,76 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dodaj igralca</title>
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+    @keyframes clickAnimation {
+        0%{background:white;}25%{background:red;}50%{background:yellow;}75%{background:lightgreen;}100%{background:lightblue;}
+    }
+
+    /* LIGHT (default) е како што беше – не го пипаме */
+
+    /* DARK THEME */
+    body.dark {
+        background: linear-gradient(to bottom right, #0f172a, #1e293b) !important;
+        color:#e5e7eb !important;
+    }
+
+    body.dark main {
+        background-color:#0f172a !important;
+        border:1px solid #475569 !important;
+        color:#e5e7eb !important;
+    }
+
+    body.dark h1,
+    body.dark p,
+    body.dark span {
+        color:#e5e7eb !important;
+    }
+
+    /* Tabs */
+    body.dark #tab-register,
+    body.dark #tab-login {
+        background-color:#111827 !important;
+        color:#e5e7eb !important;
+        border:1px solid #374151 !important;
+    }
+
+    body.dark #tab-register.text-white,
+    body.dark #tab-login.text-white {
+        background-color:#2563eb !important;
+        border-color:#2563eb !important;
+        color:#e5e7eb !important;
+    }
+
+    /* Inputs */
+    body.dark input {
+        background-color:#0f172a !important;
+        border-color:#475569 !important;
+        color:#e5e7eb !important;
+    }
+
+    body.dark input::placeholder {
+        color:#94a3b8 !important;
+    }
+
+    /* Buttons (register/login) */
+    body.dark form button {
+        background-color:#2563eb !important;
+        border-color:#2563eb !important;
+        color:#e5e7eb !important;
+    }
+
+    body.dark form button:hover {
+        background-color:#1d4ed8 !important;
+    }
+
+    /* Message text */
+    body.dark #message.text-gray-600 {
+        color:#e5e7eb !important;
+    }
+    </style>
 </head>
+
 <body class="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center min-h-screen font-sans">
 <main class="bg-white/80 backdrop-blur-md rounded-3xl shadow-lg p-6 w-full max-w-sm space-y-5">
     <header class="text-center">
@@ -43,6 +112,12 @@
 </main>
 
 <script>
+    // init dark/light theme
+    (function initTheme() {
+        const theme = localStorage.getItem('theme') || 'light';
+        document.body.classList.toggle('dark', theme === 'dark');
+    })();
+
     const registerTab = document.getElementById('tab-register');
     const loginTab = document.getElementById('tab-login');
     const registerForm = document.getElementById('register-form');
