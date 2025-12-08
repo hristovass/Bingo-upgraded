@@ -135,9 +135,10 @@
     body.dark button[onclick*="leaderboard.html"]:hover {
         background-color: #0f172a !important;
     }
+
     .avatar-btn {
-    background-color: #e9d5ff; 
-    color: #4b5563;
+        background-color: #e9d5ff; 
+        color: #4b5563;
     }
     body.dark .avatar-btn {
         background-color: #7c3aed !important;  
@@ -267,10 +268,6 @@ const startBtn = document.getElementById("start-game");
 const addBtn = document.getElementById("add-player-btn");
 const playersList = document.getElementById("players-list");
 
-/* initial load */
-loadCategories();
-loadGrades();
-
 /* ---------- HELPERS ---------- */
 function updateAddPlayerButtonState() {
     if (players.length >= MAX_PLAYERS) {
@@ -295,6 +292,73 @@ function enableStartButton() {
         startBtn.classList.remove("bg-blue-600", "hover:bg-blue-700", "cursor-pointer");
     }
 }
+
+/* ---- NEW: work with localStorage for players ---- */
+function getPlayerKey(player) {
+    return player?.id ?? `${player.first_name}::${player.last_name}`;
+}
+
+function savePlayersToStorage() {
+    try {
+        sessionStorage.setItem('players_list', JSON.stringify(players));
+    } catch (e) {
+        console.error('Ne morem shraniti igralcev v localStorage', e);
+    }
+}
+
+function renderPlayersFromState() {
+    playersList.innerHTML = "";
+
+    if (!players || players.length === 0) {
+        playersList.innerHTML = "<p>Ni še dodanih igralcev.</p>";
+        updateAddPlayerButtonState();
+        enableStartButton();
+        return;
+    }
+
+    players.forEach(player => {
+        const key = String(getPlayerKey(player));
+
+        const row = document.createElement("div");
+        row.dataset.key = key;
+        row.className = "p-2 border rounded-lg bg-white";
+
+        row.innerHTML = `
+            <div class="flex justify-between items-center">
+                <span>${player.first_name} ${player.last_name}</span>
+                <button class="px-2 py-1 text-sm rounded avatar-btn"
+                        onclick="openAvatarSelector('${key}')">
+                    Izberi avatar 🎨
+                </button>
+            </div>
+            <img id="avatar-${key}"
+                 class="w-12 h-12 rounded-full mt-2 hidden border-2 border-purple-400">
+        `;
+
+        playersList.appendChild(row);
+        playerKeys.add(key);
+    });
+
+    loadPlayerAvatars();
+    updateAddPlayerButtonState();
+    enableStartButton();
+}
+
+/* restore players on page load */
+(function restorePlayersFromStorage() {
+    const saved = sessionStorage.getItem('players_list');
+    if (!saved) return;
+
+    try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+            players = parsed;
+            renderPlayersFromState();
+        }
+    } catch (e) {
+        console.error('Napaka pri branju players_list iz localStorage', e);
+    }
+})();
 
 /* ---------- LOAD CATEGORIES ---------- */
 async function loadCategories() {
@@ -359,6 +423,10 @@ async function loadGrades() {
     });
 }
 
+/* initial load */
+loadCategories();
+loadGrades();
+
 /* ---------- AVATARS ---------- */
 function openAvatarSelector(playerId) {
     localStorage.setItem("avatar_select_player", playerId);
@@ -367,9 +435,10 @@ function openAvatarSelector(playerId) {
 
 function loadPlayerAvatars() {
     players.forEach(p => {
-        const saved = localStorage.getItem("avatar_" + p.id);
+        const key = getPlayerKey(p);
+        const saved = localStorage.getItem("avatar_" + key);
         if (saved) {
-            const img = document.getElementById("avatar-" + p.id);
+            const img = document.getElementById("avatar-" + key);
             if (img) {
                 img.src = "images/avatars/" + saved;
                 img.classList.remove("hidden");
@@ -382,7 +451,7 @@ function loadPlayerAvatars() {
 updateAddPlayerButtonState();
 
 window.api.onPlayerAdded((player) => {
-    const key = player?.id ?? `${player.first_name}::${player.last_name}`;
+    const key = getPlayerKey(player);
 
     // prevent duplicates
     if (playerKeys.has(String(key))) {
@@ -409,22 +478,25 @@ window.api.onPlayerAdded((player) => {
     row.dataset.key = String(key);
     row.className = "p-2 border rounded-lg bg-white";
 
-  row.innerHTML = `
-    <div class="flex justify-between items-center">
-        <span>${player.first_name} ${player.last_name}</span>
-        <button class="px-2 py-1 text-sm rounded avatar-btn"
-                onclick="openAvatarSelector('${key}')">
-            Izberi avatar 🎨
-        </button>
-    </div>
-    <img id="avatar-${key}"
-         class="w-12 h-12 rounded-full mt-2 hidden border-2 border-purple-400">
-`;
+    row.innerHTML = `
+        <div class="flex justify-between items-center">
+            <span>${player.first_name} ${player.last_name}</span>
+            <button class="px-2 py-1 text-sm rounded avatar-btn"
+                    onclick="openAvatarSelector('${key}')">
+                Izberi avatar 🎨
+            </button>
+        </div>
+        <img id="avatar-${key}"
+             class="w-12 h-12 rounded-full mt-2 hidden border-2 border-purple-400">
+    `;
 
     playersList.appendChild(row);
 
     players.push(player);
     playerKeys.add(String(key));
+
+    // NEW: save to localStorage so they persist after avatar selection
+    savePlayersToStorage();
 
     loadPlayerAvatars();
     enableStartButton();

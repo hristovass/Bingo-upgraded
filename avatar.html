@@ -65,6 +65,14 @@
             class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg">
         Nazaj
     </button>
+    <!-- MODAL FOR AVATAR SELECTION -->
+    <div id="avatarModal"
+        class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+        <div class="bg-white dark:bg-[#0f172a] p-6 rounded-3xl shadow-2xl flex flex-col items-center gap-4">
+            <h2 class="text-lg font-semibold text-gray-700 dark:text-gray-200">Avatar izbran!</h2>
+            <img id="selectedAvatarImg" class="w-32 h-32 rounded-2xl shadow-lg border-2 border-purple-400">
+        </div>
+    </div>
 
 </main>
 
@@ -116,11 +124,17 @@
         `;
 
         if (!locked) {
-            div.onclick = () => {
-                localStorage.setItem("avatar_" + playerId, avatar.file);
-                alert("Avatar izbran! 😊");
-                window.location.href = "index.html";
-            };
+    div.onclick = () => {
+        localStorage.setItem("avatar_" + playerId, avatar.file);
+
+        document.getElementById("selectedAvatarImg").src = "images/avatars/" + avatar.file;
+        const modal = document.getElementById("avatarModal");
+        modal.classList.remove("hidden");
+
+        setTimeout(() => {
+            window.location.href = "index.html";
+        }, 800);
+    };
         } else {
             div.onclick = () => {
                 alert("Ta avatar se odklene pri " + avatar.unlockAt + " točkah! 🔒");
@@ -134,19 +148,31 @@
     function renderAvatars() {
         container.innerHTML = "";
 
+        // osnovni – vedno odklenjeni
         basicAvatars.forEach(av => container.appendChild(createAvatarBox(av, false)));
 
+        // zaklenjeni po točkah
         lockedAvatars.forEach(av => {
             const isLocked = score < av.unlockAt;
             container.appendChild(createAvatarBox(av, isLocked));
         });
     }
 
-    // ⭐ Pridobi total score iz SUPABASE ⭐
+    // 1) prvo narišemo avatarje z default score = 0
+    renderAvatars();
+
+    // 2) potem asinhono dobimo pravi score in, če se razlikuje, osvežimo
     window.api.getTotalScore(playerId).then(res => {
-        score = res?.total || 0;
-        renderAvatars();
+        const newScore = res?.total || 0;
+        if (newScore !== score) {
+            score = newScore;
+            renderAvatars();
+        }
+    }).catch(err => {
+        console.error("Napaka pri getTotalScore:", err);
+        // v najslab slučaj ostane score = 0, avatarji vseeno vidni
     });
+
 </script>
 
 </body>
