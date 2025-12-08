@@ -6,14 +6,117 @@
     <title>Quiz Bingo — Game</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @keyframes clickAnimation {
-  0%   {background-color:white;}
-  25%  {background-color:red;}
-  50%  {background-color:yellow;}
-  75%  {background-color:lightgreen;}
-  100% {background-color:lightblue;}
-}
-    </style>
+    @keyframes clickAnimation {
+    0%{background:white;}25%{background:red;}50%{background:yellow;}75%{background:lightgreen;}100%{background:lightblue;}
+    }
+
+    body.dark {
+        background: linear-gradient(to bottom right,#0f172a,#1e293b) !important;
+        color:#e5e7eb !important;
+    }
+
+    body.dark h1, body.dark h2, body.dark h3,
+    body.dark p, body.dark span {
+        color:#e5e7eb !important;
+    }
+
+    body.dark section {
+        background:#1e293b !important;
+        color:#e5e7eb !important;
+        border-color:#334155 !important;
+    }
+
+    body.dark .bg-gradient-to-r {
+        background:#1e293b !important;
+        color:#f1f5f9 !important;
+    }
+
+    body.dark .px-3.py-1.bg-gray-200 {
+        background:#334155 !important;
+        color:#f1f5f9 !important;
+    }
+
+    body.dark .timerBar { background:#3b82f6 !important; }
+    body.dark .w-full.bg-gray-200 { background:#1e293b !important; }
+
+    body.dark .qButtons {
+        background:#334155 !important;
+        color:#f8fafc !important;
+        border-color:#475569 !important;
+    }
+
+    body.dark .qButtons:hover { background:#475569 !important; }
+
+    body.dark .qButtons.bg-white {
+        background:#334155 !important;
+        color:#f8fafc !important;
+    }
+
+    body.dark #boards > div {
+        background:#1e293b !important;
+        border-color:#475569 !important;
+    }
+
+    body.dark #boards div div { color:#e2e8f0 !important; }
+
+    body.dark .bg-blue-500 { background:#2563eb !important; }
+    body.dark .bg-yellow-400 { background:#ca8a04 !important; }
+
+    body.dark #toast {
+        background:#1e293b !important;
+        color:#f1f5f9 !important;
+        border-color:#475569 !important;
+    }
+
+    body.dark #winnerModal > div,
+    body.dark #winnerModal > div div {
+        background:#1e293b !important;
+        color:#f8fafc !important;
+        border-color:#334155 !important;
+    }
+    
+    body.dark .board-grid div {
+        border-color: #64748b !important;   
+    }
+
+    body.dark .board-grid div.bg-white {
+        background-color: #1e293b !important;
+    }
+
+    
+    body.dark .board-grid div.bg-yellow-400 {
+        background-color: #ca8a04 !important;
+    }
+
+    
+    body.dark [data-player] {
+        background-color: #0f172a !important;
+        border: 1px solid #475569 !important;
+    }
+
+    body.dark section {
+        border: 1px solid #475569 !important;
+    }
+    body.dark .bg-gradient-to-r {
+    background: #1e293b !important;       
+    color: #e5e7eb !important;            
+    border: 1px solid #475569 !important; 
+    }
+        /* Dark mode – овозможи зелено/црвено копче */
+    body.dark .qButtons.bg-green-500 {
+        background-color: #16a34a !important; /* зелено */
+        border-color: #16a34a !important;
+        color: #f9fafb !important;
+    }
+
+    body.dark .qButtons.bg-red-500 {
+        background-color: #ef4444 !important; /* црвено */
+        border-color: #ef4444 !important;
+        color: #f9fafb !important;
+    }
+
+</style>
+
 </head>
 
 <body class="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-6 lg:p-10 font-sans">
@@ -39,7 +142,7 @@
             <div class="bg-blue-500 h-2 timerBar" style="width: 100%;"></div>
         </div>
         <div class="flex justify-center">
-        <img src="" alt="Question Image" class="hidden" width="200px" height="150px"/>
+            <img src="" alt="Question Image" class="hidden" width="200px" height="150px"/>
         </div>
         <!-- Question -->
         <div class="bg-gradient-to-r from-purple-100 to-pink-100 p-6 rounded-lg text-center">
@@ -48,14 +151,10 @@
 
         <!-- Answer buttons -->
         <div class="grid grid-cols-2 gap-4">
-            <button id="0" class="qButtons py-4 border rounded-lg hover:scale-105 transition-transform flex items-center justify-center gap-2">
-            </button>
-            <button id="1" class="qButtons py-4 border rounded-lg hover:scale-105 transition-transform flex items-center justify-center gap-2">
-            </button>
-            <button id="2" class="qButtons py-4 border rounded-lg hover:scale-105 transition-transform flex items-center justify-center gap-2">
-            </button>
-            <button id="3" class="qButtons py-4 border rounded-lg hover:scale-105 transition-transform flex items-center justify-center gap-2">
-            </button>
+            <button id="0" class="qButtons py-4 border rounded-lg hover:scale-105 transition-transform flex items-center justify-center gap-2"></button>
+            <button id="1" class="qButtons py-4 border rounded-lg hover:scale-105 transition-transform flex items-center justify-center gap-2"></button>
+            <button id="2" class="qButtons py-4 border rounded-lg hover:scale-105 transition-transform flex items-center justify-center gap-2"></button>
+            <button id="3" class="qButtons py-4 border rounded-lg hover:scale-105 transition-transform flex items-center justify-center gap-2"></button>
         </div>
     </section>
 
@@ -65,7 +164,63 @@
     <div class="text-center text-sm text-gray-500 mt-8">
         <span class="font-semibold">Digitalna Brigada</span>
     </div>
+
+    <!-- AUDIO: background music + timer tick + correct/error -->
+    <audio id="bgMusic" src="./sounds/background.mp3" preload="auto" loop></audio>
+    <audio id="tickSound" src="./sounds/tick.mp3" preload="auto"></audio>
+    <audio id="correctSound" src="./sounds/correct.mp3" preload="auto"></audio>
+    <audio id="errorSound" src="./sounds/error.mp3" preload="auto"></audio>
+
     <script>
+         (function initTheme() {
+        const theme = localStorage.getItem('theme') || 'light';
+        document.body.classList.toggle('dark', theme === 'dark');
+    })();
+       
+        function musicEnabled() {
+            return localStorage.getItem('music') !== 'off';
+        }
+
+        function sfxEnabled() {
+            return localStorage.getItem('sfx') !== 'off';
+        }
+
+        const bgMusic = document.getElementById('bgMusic');
+        const tickSound = document.getElementById('tickSound');
+        const correctSound = document.getElementById('correctSound');
+        const errorSound = document.getElementById('errorSound');
+
+        function playBgMusic() {
+            if (!musicEnabled() || !bgMusic) return;
+            bgMusic.volume = 0.3;
+            bgMusic.play().catch(() => {});
+        }
+
+        function stopBgMusic() {
+            if (!bgMusic) return;
+            bgMusic.pause();
+            bgMusic.currentTime = 0;
+        }
+
+        function playTick() {
+            if (!sfxEnabled() || !tickSound) return;
+            tickSound.currentTime = 0;
+            tickSound.play().catch(() => {});
+        }
+
+        function playCorrect() {
+            if (!sfxEnabled() || !correctSound) return;
+            correctSound.currentTime = 0;
+            correctSound.play().catch(() => {});
+        }
+
+        function playerror() {
+            if (!sfxEnabled() || !errorSound) return;
+            errorSound.currentTime = 0;
+            errorSound.play().catch(() => {});
+        }
+
+        // ---- ORIGINAL GAME STATE ----
         let game = [];
         let gameData = [];
         let parameters = {};
@@ -73,15 +228,14 @@
         let questionIndex = -1;
         let limitIndex = 20;
         let questionImage = document.querySelector("img");
-    let playerIds = [];
-    let playerNames = [];
-    let playerCount = 0;
-    let boards = [];
-    let currentPlayer = 0;
-    let gameOver = false;
-    let toastTimer = null;
+        let playerIds = [];
+        let playerNames = [];
+        let playerCount = 0;
+        let boards = [];
+        let currentPlayer = 0;
+        let gameOver = false;
+        let toastTimer = null;
 
-        
         let timerInterval;
         let timeRemaining = 15;  // Timer starts at 15 seconds
         const progressBar = document.querySelector('.timerBar');
@@ -91,9 +245,11 @@
         for (var i = 0; i < buttons.length; i++) {
             buttons[i].addEventListener('click', selectedAnswer, false);
         }
+
         window.onload = function() {
             enterData();
         };
+
         async function enterData(){
             console.log("Loading game data...");
             parameters = JSON.parse(localStorage.getItem('parameters'));
@@ -115,6 +271,7 @@
             play();
             startTimer();
         }
+
         function play(){
             if (gameOver) return;
             questionIndex++;
@@ -139,10 +296,12 @@
             startTimer();
         }
 
-        async function selectedAnswer(event){
+        /*async function selectedAnswer(event){
             const button = event.target;
+            
             button.classList.add("border-blue-500", "bg-blue-50", "shadow-md", "selected");
             button.style.animation = "clickAnimation 1.5s linear 0s infinite alternate";
+
             if (gameOver) return;
             const pIdx = questionIndex % playerCount;
             console.log(pIdx, gameData[questionIndex].id, parseInt(button.id))
@@ -153,10 +312,12 @@
                     boards[pIdx] = result.board;
                     updateBoard(pIdx);
                 }
-                // Show feedback toast
+                
                 if (isCorrectAnswer) {
+                    playCorrect();
                     showToast(`✅ Pravilen odgovor, ${playerNames[pIdx]}!`, 'success');
                 } else {
+                    playerror();
                     showToast(`❌ Napačen odgovor, ${playerNames[pIdx]}! Poskusi ponovno.`, 'error');
                 }
                 if (result?.bingo) {
@@ -174,14 +335,72 @@
                 button.style.animation = "";
                 if (!gameOver) play();
             }, 1000);
+        }*/
+        async function selectedAnswer(event){
+        const button = event.target;
+        if (gameOver) return;
+
+        // блокирај ги сите копчиња додека трае анимацијата
+        const allBtns = document.getElementsByClassName("qButtons");
+        Array.from(allBtns).forEach(b => b.disabled = true);
+
+        const pIdx = questionIndex % playerCount;
+        console.log(pIdx, gameData[questionIndex].id, parseInt(button.id));
+
+        try {
+            const result = await window.api.answer(
+                pIdx,
+                gameData[questionIndex].id,
+                parseInt(button.id)
+            );
+            isCorrectAnswer = !!result?.correct;
+
+            if (Array.isArray(result?.board)) {
+                boards[pIdx] = result.board;
+                updateBoard(pIdx);
+            }
+
+            // визуелен фидбек + звук
+            if (isCorrectAnswer) {
+                playCorrect();
+                button.classList.add("bg-green-500","text-white","border-green-500");
+            } else {
+                playerror();
+                button.classList.add("bg-red-500","text-white","border-red-500");
+            }
+
+            if (result?.bingo) {
+                endGame(pIdx);
+            }
+        } catch (e) {
+            console.error('answer error', e);
+            isCorrectAnswer = false;
+            playerror();
         }
+
+        // после кратко време – ресет на сите копчиња и следно прашање
+        setTimeout(function (){
+            Array.from(allBtns).forEach(b => {
+                b.classList.remove(
+                    "bg-green-500","text-white","border-green-500",
+                    "bg-red-500","border-red-500",
+                    "border-blue-500","bg-blue-50","shadow-md","selected"
+                );
+                b.classList.add("border-gray-200","bg-white");
+                b.style.animation = "";
+                b.disabled = false;
+            });
+
+            if (!gameOver) play();
+        }, 700);
+    }
 
         function shuffle(array) {
             let currentIndex = array.length;
             while (currentIndex != 0) {
                 let randomIndex = Math.floor(Math.random() * currentIndex);
                 currentIndex--;
-                [array[currentIndex], array[randomIndex]] = [
+                [array[currentIndex], array[currentIndex]] = [
                 array[randomIndex], array[currentIndex]];
             }
         }
@@ -194,14 +413,22 @@
             timeRemaining = 15;
             updateTimerDisplay(timeRemaining);
             updateProgressBar(timeRemaining);
-            // 1x na sekundo
+
+            
+            playBgMusic();
+
+            // 1x на секundo
             timerInterval = setInterval(function() {
                 timeRemaining--;
                 updateTimerDisplay(timeRemaining);
                 updateProgressBar(timeRemaining);
 
+                
+                playTick();
+
                 if (timeRemaining <= 0 && !gameOver) {
                     clearInterval(timerInterval);
+                    stopBgMusic();
                     play();
                 }
             }, 1000);
