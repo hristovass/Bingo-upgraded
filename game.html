@@ -115,19 +115,47 @@
     }
 
     body.dark .streak-line {
-        color: #fb923c !important;
+    color: #fdba74 !important; 
+    font-weight: 600;
+}
+
+    @keyframes bonusFlash {
+        0% { background-color: #facc15; }
+        50% { background-color: #fde047; }
+        100% { background-color: #facc15; }
     }
 
-    /* BONUS TIMER FLASH (rumeno utripanje) */
-@keyframes bonusFlash {
-    0% { background-color: #facc15; }   /* bright yellow */
-    50% { background-color: #fde047; }  /* lighter yellow */
-    100% { background-color: #facc15; }
-}
+    .bonus-active {
+        animation: bonusFlash 0.8s infinite ease-in-out;
+    }
+       
+    #skipBtn {
+        background-color: #f3f4f6;  
+        border-color: #d1d5db;
+        color: #1f2937;              
+    }
 
-.bonus-active {
-    animation: bonusFlash 0.8s infinite ease-in-out;
-}
+    #skipBtn:hover:not(:disabled) {
+        background-color: #e5e7eb;   
+    }
+
+    #skipBtn #skipCounter {
+        color: #1f2937;              
+    }
+
+    body.dark #skipBtn {
+        background-color: #111827;   
+        border-color: #4b5563;
+        color: #f9fafb;
+    }
+
+    body.dark #skipBtn:hover:not(:disabled) {
+        background-color: #1f2937;      
+    }
+
+    body.dark #skipBtn #skipCounter {
+        color: #4ade80;                
+    }
 
     </style>
 </head>
@@ -172,6 +200,18 @@
             <button id="2" class="qButtons py-4 border rounded-lg hover:scale-105 transition-transform flex items-center justify-center gap-2"></button>
             <button id="3" class="qButtons py-4 border rounded-lg hover:scale-105 transition-transform flex items-center justify-center gap-2"></button>
         </div>
+
+        <!-- Skip button -->
+        <div class="flex justify-center mt-4">
+                <button id="skipBtn"
+                class="px-4 py-2 rounded-lg border text-sm font-semibold
+                    transition hover:scale-105 bg-gray-700 text-white">
+                ⏭️ Preskoči vprašanje 
+                (<span id="skipCounter" class="font-bold">2</span>/2)
+            </button>
+
+        </div>
+
     </section>
 
     <!-- Bingo Boards (dynamic) -->
@@ -255,15 +295,73 @@
     let streaks = []; // 🔥 streak по играч
     let bonusTime = false;  
 
+    // skip по играч
+    let skipCounts = [];       
+    const maxSkipsPerPlayer = 2;
 
     let timerInterval;
     let timeRemaining = 15;  // Timer starts at 15 seconds
     const progressBar = document.querySelector('.timerBar');
     const timerDisplay = document.querySelector('.px-3.py-1.bg-gray-200');
 
+    const skipBtn = document.getElementById("skipBtn");
+    const skipCounter = document.getElementById("skipCounter");
+
+    function updateSkipButton() {
+        if (!skipBtn || !skipCounter || playerCount === 0) return;
+
+        const pIdx = currentPlayer;
+        const used = skipCounts[pIdx] || 0;
+        const remaining = Math.max(0, maxSkipsPerPlayer - used);
+
+        skipCounter.textContent = remaining;
+
+        if (gameOver || remaining === 0) {
+            skipBtn.disabled = true;
+            skipBtn.classList.add("opacity-60","cursor-not-allowed");
+        } else {
+            skipBtn.disabled = false;
+            skipBtn.classList.remove("opacity-60","cursor-not-allowed");
+        }
+    }
+
     const buttons = document.getElementsByClassName("qButtons");
     for (var i = 0; i < buttons.length; i++) {
         buttons[i].addEventListener('click', selectedAnswer, false);
+    }
+
+    if (skipBtn) {
+        skipBtn.addEventListener("click", skipQuestion);
+    }
+
+    function skipQuestion() {
+        if (gameOver || playerCount === 0) return;
+
+        const pIdx = currentPlayer;
+
+        
+        if (skipCounts[pIdx] >= maxSkipsPerPlayer) {
+            showToast("Ta igralec nima več preskokov 🙃", "error");
+            updateSkipButton();
+            return;
+        }
+
+        // зголеми skip за овој играч
+        skipCounts[pIdx]++;
+        updateSkipButton();
+
+        // стопирај тајмер и музика за ова прашање
+        if (timerInterval) {
+            clearInterval(timerInterval);
+        }
+        stopBgMusic();
+
+    
+        // инфо toast (нема поени, нема казна)
+        showToast("Vprašanje preskočeno. Brez točk in brez kazni 🙂", "info");
+
+        // оди на следно прашање
+        play();
     }
 
     window.onload = function() {
@@ -280,8 +378,9 @@
             playerNames.push(`${parameters.players[i].first_name} ${parameters.players[i].last_name}`);
         }
 
-        // init streaks
+        // init streaks и skipCounts
         streaks = new Array(playerCount).fill(0);
+        skipCounts = new Array(playerCount).fill(0);
 
         console.log(parameters.players);
         game = await window.api.startGame(parameters.grade, parameters.category, playerIds);
@@ -295,6 +394,7 @@
         renderBoards();
         play();
         startTimer();
+        updateSkipButton();
     }
 
     function play(){
@@ -317,6 +417,7 @@
         document.getElementById("1").innerText = gameData[questionIndex].options[1];
         document.getElementById("2").innerText = gameData[questionIndex].options[2];
         document.getElementById("3").innerText = gameData[questionIndex].options[3];
+        updateSkipButton();   // ажурирај копче за нов играч
         startTimer();
     }
 
@@ -403,7 +504,6 @@
         }
         if (gameOver) return;
         timeRemaining = bonusTime ? 20 : 15;
-        //bonusTime=false;
 
         updateTimerDisplay(timeRemaining);
         if (bonusTime) {
@@ -532,6 +632,11 @@
             btn.disabled = true;
             btn.classList.add('opacity-60','cursor-not-allowed');
         });
+
+        if (skipBtn) {
+            skipBtn.disabled = true;
+            skipBtn.classList.add('opacity-60','cursor-not-allowed');
+        }
     }
 
     function endGame(winnerIdx){
@@ -540,6 +645,7 @@
         disableAnswerButtons();
         highlightTurn(-1);
         showWinnerModal(playerNames[winnerIdx]);
+        updateSkipButton();
     }
 
     function showWinnerModal(name){
