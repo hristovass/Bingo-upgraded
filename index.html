@@ -35,26 +35,24 @@
     }
 
     /* Grade + Category cards */
-    body.dark #grade-cards div,
-    body.dark #category-cards div {
-        background-color: #334155 !important; 
-        border-color: #475569 !important;     
-        color: #e5e7eb !important;
-    }
+    /* Grade cards (DARK) */
+body.dark #grade-cards div {
+    background-color: #334155 !important; 
+    border-color: #475569 !important;     
+    color: #e5e7eb !important;
+}
 
-    /* Hover effect */
-    body.dark #grade-cards div:hover,
-    body.dark #category-cards div:hover {
-        background-color: #475569 !important;
-        transform: scale(1.03);
-    }
+/* Grade hover */
+body.dark #grade-cards div:hover {
+    background-color: #475569 !important;
+    transform: scale(1.03);
+}
 
-    /* Selected cards */
-    body.dark #grade-cards .selected,
-    body.dark #category-cards .selected {
-        background-color: #1e3a8a !important; 
-        border-color: #3b82f6 !important;
-    }
+/* Grade selected */
+body.dark #grade-cards .selected {
+    background-color: #1e3a8a !important; 
+    border-color: #3b82f6 !important;
+}
 
     /* Add Player button */
     body.dark #add-player-btn {
@@ -152,6 +150,33 @@
     body.dark .avatar-btn:hover {
         background-color: #6d28d9 !important;
     }
+
+    /* Category cards in dark mode */
+body.dark .category-card {
+    background-color: #1e293b !important;
+    border-color: #475569 !important;
+    color: #e5e7eb !important;
+}
+
+/* Category badge in dark mode */
+body.dark .category-badge {
+    background-color: #0f172a !important;
+    color: #f3e8ff !important;
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Category icon highlight in dark mode */
+body.dark .category-icon {
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6));
+}
+
+/* Selected category card (dark) */
+body.dark #category-cards .selected {
+    background-color: #020617 !important;
+    border-color: #a855f7 !important;
+    box-shadow: 0 0 12px rgba(168, 85, 247, 0.4) !important;
+}
+
     </style>
 </head>
 
@@ -370,26 +395,57 @@ function renderPlayersFromState() {
 })();
 
 /* ---------- LOAD CATEGORIES ---------- */
+/* ---------- LOAD CATEGORIES (fancy mashup + DARK MODE SUPPORT) ---------- */
 async function loadCategories() {
     const categories = (await window.api.loadMenu()).categories;
 
     const container = document.getElementById("category-cards");
     container.innerHTML = "";
 
+    // ikone glede na ime predmeta (fallback = 📚)
+    const subjectIcons = {
+        "Angleščina": "📘",
+        "Anglščina": "📘",
+        "Matematika": "➕",
+        "Naravoslovje": "🌿",
+        "Družboslovje": "🌍",
+        "Slovenščina": "📖",
+        "Likovna umetnost": "🎨",
+        "Glasba": "🎵"
+    };
+
     categories.forEach(cat => {
         const card = document.createElement("div");
         card.dataset.id = cat.id;
+
+        const icon = subjectIcons[cat.name] || "📚";
+
+        // Base card style (light mode)
         card.className =
-            "p-4 border-2 border-gray-200 rounded-xl cursor-pointer bg-white transition-all";
+            "category-card p-4 border-2 border-gray-200 rounded-2xl cursor-pointer bg-white " +
+            "transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md " +
+            "flex items-center justify-center text-center";
 
-        card.innerHTML = `<h3 class="font-semibold text-lg">${cat.name}</h3>`;
+        // Inner content with icon + badge
+        card.innerHTML = `
+            <div class="flex flex-col items-center gap-2">
+                <span class="category-icon text-2xl">${icon}</span>
+                <span class="category-badge px-4 py-1 rounded-full bg-purple-50 text-purple-700 
+                            font-semibold text-sm sm:text-base tracking-wide shadow-sm">
+                    ${cat.name}
+                </span>
+            </div>
+        `;
 
+        // click → select/unselect
         card.onclick = () => {
-            if (card.classList.contains("border-green-500")) {
-                card.classList.remove("border-green-500", "bg-green-50", "selected");
+            if (card.classList.contains("selected")) {
+                card.classList.remove("selected", "border-purple-500", "bg-purple-50",
+                                      "dark-selected", "shadow-lg", "scale-[1.02]");
                 categoriesSelected--;
             } else {
-                card.classList.add("border-green-500", "bg-green-50", "selected");
+                card.classList.add("selected", "border-purple-500", "bg-purple-50",
+                                   "dark-selected", "shadow-lg", "scale-[1.02]");
                 categoriesSelected++;
             }
             enableStartButton();
@@ -398,6 +454,7 @@ async function loadCategories() {
         container.appendChild(card);
     });
 }
+
 
 /* ---------- LOAD GRADES ---------- */
 async function loadGrades() {
