@@ -209,6 +209,12 @@
                 ⏭️ Preskoči vprašanje 
                 (<span id="skipCounter" class="font-bold">2</span>/2)
             </button>
+            <!-- 50/50 GUMB (skrit dokler ni 5 napačnih) -->
+    <button id="fiftyBtn"
+        class="px-4 py-2 rounded-lg border text-sm font-semibold bg-purple-600 text-white
+            transition hover:scale-105 hidden">
+        🎲 Uporabi 50/50
+    </button>
 
         </div>
 
@@ -300,6 +306,11 @@
     let skipCounts = [];       
     const maxSkipsPerPlayer = 2;
 
+    let failStreak = [];   
+    let fiftyAvailable = [];
+    let fiftyUsedAlready = [];
+    
+
     let timerInterval;
     let timeRemaining = 15;  // Timer starts at 15 seconds
     const progressBar = document.querySelector('.timerBar');
@@ -326,6 +337,8 @@
         }
     }
 
+
+
     const buttons = document.getElementsByClassName("qButtons");
     for (var i = 0; i < buttons.length; i++) {
         buttons[i].addEventListener('click', selectedAnswer, false);
@@ -334,6 +347,25 @@
     if (skipBtn) {
         skipBtn.addEventListener("click", skipQuestion);
     }
+
+    const fiftyBtn = document.getElementById("fiftyBtn");
+if (fiftyBtn) {
+    fiftyBtn.addEventListener("click", function () {
+        const pIdx = currentPlayer;
+        if (!fiftyAvailable[pIdx]) return;
+
+        const correctIndex = gameData[questionIndex].correct_answer;
+
+
+        activateFiftyFifty(correctIndex);
+
+        fiftyAvailable[pIdx] = false; // porabil ga je
+        updateFiftyButton();
+
+        showToast("Uporabljen 50/50! 🎲", "success");
+    });
+}
+
 
     function skipQuestion() {
         if (gameOver || playerCount === 0) return;
@@ -383,6 +415,10 @@
         streaks = new Array(playerCount).fill(0);
         skipCounts = new Array(playerCount).fill(0);
 
+        failStreak = new Array(playerCount).fill(0);
+        fiftyAvailable = new Array(playerCount).fill(false);
+        fiftyUsedAlready = new Array(playerCount).fill(false);
+
         playerBonus = new Array(playerCount).fill(false);
 
         console.log(parameters.players);
@@ -402,6 +438,7 @@
 
     function play(){
         if (gameOver) return;
+        resetAnswerButtons();
         questionIndex++;
         if(questionIndex > limitIndex){
             questionIndex = 0;
@@ -422,7 +459,42 @@
         document.getElementById("3").innerText = gameData[questionIndex].options[3];
         updateSkipButton();   // ажурирај копче за нов играч
         startTimer();
+        updateFiftyButton();
     }
+
+    function updateFiftyButton() {
+    const pIdx = currentPlayer;
+    const btn = document.getElementById("fiftyBtn");
+
+    if (!btn) return;
+
+    if (fiftyAvailable[pIdx]) {
+        btn.classList.remove("hidden");
+    } else {
+        btn.classList.add("hidden");
+    }
+}
+
+function resetAnswerButtons() {
+    const buttons = [...document.getElementsByClassName("qButtons")];
+    buttons.forEach(btn => {
+        btn.disabled = false;
+        btn.classList.remove("opacity-30");
+    });
+}
+
+
+function activateFiftyFifty(correctIndex) {
+    const buttons = [...document.getElementsByClassName("qButtons")];
+    let wrongButtons = buttons.filter(btn => parseInt(btn.id) !== correctIndex);
+    let toHide = wrongButtons.sort(() => 0.5 - Math.random()).slice(0, 2);
+
+    toHide.forEach(btn => {
+        btn.disabled = true;
+        btn.classList.add("opacity-30");
+    });
+}
+
 
     async function selectedAnswer(event){
         const button = event.target;
@@ -448,6 +520,9 @@
             }
 
             if (isCorrectAnswer) {
+
+                failStreak[pIdx] = 0;
+
                 streaks[pIdx] = (streaks[pIdx] || 0) + 1;
                 if (streaks[pIdx]===3) {
                     playerBonus[pIdx] = true;
@@ -459,8 +534,19 @@
                 button.classList.add("bg-green-500","text-white","border-green-500");
             } else {
                 streaks[pIdx] = 0;
+                failStreak[pIdx]++;
+
                 playerror();
                 button.classList.add("bg-red-500","text-white","border-red-500");
+
+                if (failStreak[pIdx] === 5){
+                    failStreak[pIdx] = 0;
+                    if (!fiftyUsedAlready[pIdx]){
+                    fiftyAvailable[pIdx] = true;
+                    fiftyUsedAlready[pIdx] = true;
+                    showToast(playerNames[pIdx] + " je dobil 50/50! 🎲", "success");
+                    }
+                }
             }
 
             highlightTurn(pIdx);
@@ -475,6 +561,7 @@
         }
 
         setTimeout(function (){
+            resetAnswerButtons();
             Array.from(allBtns).forEach(b => {
                 b.classList.remove(
                     "bg-green-500","text-white","border-green-500",
