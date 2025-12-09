@@ -102,7 +102,6 @@
         border: 1px solid #475569 !important; 
     }
 
-    /* Dark mode – зелено/црвено копче */
     body.dark .qButtons.bg-green-500 {
         background-color: #16a34a !important;
         border-color: #16a34a !important;
@@ -115,7 +114,6 @@
         color: #f9fafb !important;
     }
 
-    /* Streak текст во dark mode да е јасен */
     body.dark .streak-line {
         color: #fb923c !important;
     }
@@ -253,6 +251,7 @@
     let currentPlayer = 0;
     let gameOver = false;
     let toastTimer = null;
+
     let streaks = []; // 🔥 streak по играч
     let bonusTime = false;  
 
@@ -360,7 +359,6 @@
                 button.classList.add("bg-red-500","text-white","border-red-500");
             }
 
-            // освежи streak прикажан кај играчот што е на ред
             highlightTurn(pIdx);
 
             if (result?.bingo) {
