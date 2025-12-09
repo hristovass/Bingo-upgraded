@@ -115,9 +115,9 @@
     }
 
     body.dark .streak-line {
-    color: #fdba74 !important; 
-    font-weight: 600;
-}
+        color: #fdba74 !important; 
+        font-weight: 600;
+    }
 
     @keyframes bonusFlash {
         0% { background-color: #facc15; }
@@ -174,8 +174,15 @@
 
     <!-- Question Card -->
     <section class="bg-white shadow-2xl rounded-2xl p-6 space-y-6">
+        <!-- TURN + AVATAR + TIMER -->
         <div class="flex items-center justify-between">
-            <span id="turn" class="px-3 py-1 rounded-full bg-blue-500 text-white font-medium"></span>
+            <div class="flex items-center gap-3">
+                <img id="currentAvatar"
+                     src=""
+                     alt="Avatar"
+                     class="w-10 h-10 rounded-full border border-gray-300 shadow-sm hidden" />
+                <span id="turn" class="px-3 py-1 rounded-full bg-blue-500 text-white font-medium"></span>
+            </div>
             <span class="px-3 py-1 rounded-full bg-gray-200 font-medium">⏱️ 15s</span>
         </div>
 
@@ -185,7 +192,7 @@
         </div>
 
         <div class="flex justify-center">
-            <img src="" alt="Question Image" class="hidden" width="200px" height="150px"/>
+            <img id="questionImage" src="" alt="Question Image" class="hidden" width="200px" height="150px"/>
         </div>
 
         <!-- Question -->
@@ -201,21 +208,21 @@
             <button id="3" class="qButtons py-4 border rounded-lg hover:scale-105 transition-transform flex items-center justify-center gap-2"></button>
         </div>
 
-        <!-- Skip button -->
-        <div class="flex justify-center mt-4">
-                <button id="skipBtn"
+        <!-- Skip + 50/50 buttons -->
+        <div class="flex justify-center mt-4 gap-3">
+            <button id="skipBtn"
                 class="px-4 py-2 rounded-lg border text-sm font-semibold
                     transition hover:scale-105 bg-gray-700 text-white">
                 ⏭️ Preskoči vprašanje 
                 (<span id="skipCounter" class="font-bold">2</span>/2)
             </button>
-            <!-- 50/50 GUMB (skrit dokler ni 5 napačnih) -->
-    <button id="fiftyBtn"
-        class="px-4 py-2 rounded-lg border text-sm font-semibold bg-purple-600 text-white
-            transition hover:scale-105 hidden">
-        🎲 Uporabi 50/50
-    </button>
 
+            <!-- 50/50 GUMB (skrit dokler ni 5 napačnih) -->
+            <button id="fiftyBtn"
+                class="px-4 py-2 rounded-lg border text-sm font-semibold bg-purple-600 text-white
+                    transition hover:scale-105 hidden">
+                🎲 Uporabi 50/50
+            </button>
         </div>
 
     </section>
@@ -289,18 +296,19 @@
     let isCorrectAnswer = false;
     let questionIndex = -1;
     let limitIndex = 20;
-    let questionImage = document.querySelector("img");
+    let questionImage = document.getElementById("questionImage"); // ✅ точнота слика за прашање
     let playerIds = [];
     let playerNames = [];
+    let playerAvatars = []; // 👈 avatar на сите играчи (полн од localStorage)
     let playerCount = 0;
     let boards = [];
     let currentPlayer = 0;
     let gameOver = false;
     let toastTimer = null;
 
-    let streaks = []; // 🔥 streak по играч
+    let streaks = []; 
     let bonusTime = false; 
-    let playerBonus = []; // bonus za vsakega igralca 
+    let playerBonus = []; 
 
     // skip по играч
     let skipCounts = [];       
@@ -337,8 +345,6 @@
         }
     }
 
-
-
     const buttons = document.getElementsByClassName("qButtons");
     for (var i = 0; i < buttons.length; i++) {
         buttons[i].addEventListener('click', selectedAnswer, false);
@@ -349,29 +355,25 @@
     }
 
     const fiftyBtn = document.getElementById("fiftyBtn");
-if (fiftyBtn) {
-    fiftyBtn.addEventListener("click", function () {
-        const pIdx = currentPlayer;
-        if (!fiftyAvailable[pIdx]) return;
+    if (fiftyBtn) {
+        fiftyBtn.addEventListener("click", function () {
+            const pIdx = currentPlayer;
+            if (!fiftyAvailable[pIdx]) return;
 
-        const correctIndex = gameData[questionIndex].correct_answer;
+            const correctIndex = gameData[questionIndex].correct_answer;
+            activateFiftyFifty(correctIndex);
 
+            fiftyAvailable[pIdx] = false; 
+            updateFiftyButton();
 
-        activateFiftyFifty(correctIndex);
-
-        fiftyAvailable[pIdx] = false; // porabil ga je
-        updateFiftyButton();
-
-        showToast("Uporabljen 50/50! 🎲", "success");
-    });
-}
-
+            showToast("Uporabljen 50/50! 🎲", "success");
+        });
+    }
 
     function skipQuestion() {
         if (gameOver || playerCount === 0) return;
 
         const pIdx = currentPlayer;
-
         
         if (skipCounts[pIdx] >= maxSkipsPerPlayer) {
             showToast("Ta igralec nima več preskokov 🙃", "error");
@@ -379,21 +381,16 @@ if (fiftyBtn) {
             return;
         }
 
-        // зголеми skip за овој играч
         skipCounts[pIdx]++;
         updateSkipButton();
 
-        // стопирај тајмер и музика за ова прашање
         if (timerInterval) {
             clearInterval(timerInterval);
         }
         stopBgMusic();
-
     
-        // инфо toast (нема поени, нема казна)
         showToast("Vprašanje preskočeno. Brez točk in brez kazni 🙂", "info");
 
-        // оди на следно прашање
         play();
     }
 
@@ -401,17 +398,32 @@ if (fiftyBtn) {
         enterData();
     };
 
+    // истата логика за key како во index.html
+    function getPlayerKey(player) {
+        return player?.id ?? `${player.first_name}::${player.last_name}`;
+    }
+
     async function enterData(){
         console.log("Loading game data...");
         parameters = JSON.parse(localStorage.getItem('parameters'));
         playerCount = parameters.players.length;
 
         for(let i = 0; i < playerCount; i++){
-            playerIds.push(parseInt(parameters.players[i].id));
-            playerNames.push(`${parameters.players[i].first_name} ${parameters.players[i].last_name}`);
+            const player = parameters.players[i];
+
+            playerIds.push(parseInt(player.id));
+            playerNames.push(`${player.first_name} ${player.last_name}`);
+
+            const key = String(getPlayerKey(player));
+            const savedAvatar = localStorage.getItem("avatar_" + key);
+
+            const avatarPath = savedAvatar
+                ? `images/avatars/${savedAvatar}`
+                : "images/avatars/boy1.jpg"; // default ако нема
+
+            playerAvatars.push(avatarPath);
         }
 
-        // init streaks и skipCounts
         streaks = new Array(playerCount).fill(0);
         skipCounts = new Array(playerCount).fill(0);
 
@@ -424,7 +436,7 @@ if (fiftyBtn) {
         console.log(parameters.players);
         game = await window.api.startGame(parameters.grade, parameters.category, playerIds);
         gameData = game.questions || [];
-        // initial boards from backend
+
         boards = (game.players || []).map(p => p.board);
         console.log(gameData);
         await (shuffle(gameData));
@@ -443,58 +455,71 @@ if (fiftyBtn) {
         if(questionIndex > limitIndex){
             questionIndex = 0;
         }
+
         if(gameData[questionIndex].image_path != undefined){
             questionImage.classList.remove("hidden");
             questionImage.src = "./images/" + gameData[questionIndex].image_path + ".png";
         } else {
             questionImage.classList.add("hidden");
         }
+
         currentPlayer = questionIndex % playerCount;
         document.getElementById("turn").innerText = playerNames[currentPlayer] + " je na vrsti";
         highlightTurn(currentPlayer);
+
+        // 🔥 освежи avatar за тековниот играч
+        const avatarImg = document.getElementById("currentAvatar");
+        if (avatarImg) {
+            const src = playerAvatars[currentPlayer];
+            if (src) {
+                avatarImg.src = src;
+                avatarImg.classList.remove("hidden");
+            } else {
+                avatarImg.classList.add("hidden");
+            }
+        }
+
         document.getElementById("question").innerText = gameData[questionIndex].text;
         document.getElementById("0").innerText = gameData[questionIndex].options[0];
         document.getElementById("1").innerText = gameData[questionIndex].options[1];
         document.getElementById("2").innerText = gameData[questionIndex].options[2];
         document.getElementById("3").innerText = gameData[questionIndex].options[3];
-        updateSkipButton();   // ажурирај копче за нов играч
+        updateSkipButton();
         startTimer();
         updateFiftyButton();
     }
 
     function updateFiftyButton() {
-    const pIdx = currentPlayer;
-    const btn = document.getElementById("fiftyBtn");
+        const pIdx = currentPlayer;
+        const btn = document.getElementById("fiftyBtn");
 
-    if (!btn) return;
+        if (!btn) return;
 
-    if (fiftyAvailable[pIdx]) {
-        btn.classList.remove("hidden");
-    } else {
-        btn.classList.add("hidden");
+        if (fiftyAvailable[pIdx]) {
+            btn.classList.remove("hidden");
+        } else {
+            btn.classList.add("hidden");
+        }
     }
-}
 
-function resetAnswerButtons() {
-    const buttons = [...document.getElementsByClassName("qButtons")];
-    buttons.forEach(btn => {
-        btn.disabled = false;
-        btn.classList.remove("opacity-30");
-    });
-}
+    function resetAnswerButtons() {
+        const buttons = [...document.getElementsByClassName("qButtons")];
+        buttons.forEach(btn => {
+            btn.disabled = false;
+            btn.classList.remove("opacity-30");
+        });
+    }
 
+    function activateFiftyFifty(correctIndex) {
+        const buttons = [...document.getElementsByClassName("qButtons")];
+        let wrongButtons = buttons.filter(btn => parseInt(btn.id) !== correctIndex);
+        let toHide = wrongButtons.sort(() => 0.5 - Math.random()).slice(0, 2);
 
-function activateFiftyFifty(correctIndex) {
-    const buttons = [...document.getElementsByClassName("qButtons")];
-    let wrongButtons = buttons.filter(btn => parseInt(btn.id) !== correctIndex);
-    let toHide = wrongButtons.sort(() => 0.5 - Math.random()).slice(0, 2);
-
-    toHide.forEach(btn => {
-        btn.disabled = true;
-        btn.classList.add("opacity-30");
-    });
-}
-
+        toHide.forEach(btn => {
+            btn.disabled = true;
+            btn.classList.add("opacity-30");
+        });
+    }
 
     async function selectedAnswer(event){
         const button = event.target;
@@ -542,9 +567,9 @@ function activateFiftyFifty(correctIndex) {
                 if (failStreak[pIdx] === 5){
                     failStreak[pIdx] = 0;
                     if (!fiftyUsedAlready[pIdx]){
-                    fiftyAvailable[pIdx] = true;
-                    fiftyUsedAlready[pIdx] = true;
-                    showToast(playerNames[pIdx] + " je dobil 50/50! 🎲", "success");
+                        fiftyAvailable[pIdx] = true;
+                        fiftyUsedAlready[pIdx] = true;
+                        showToast(playerNames[pIdx] + " je dobil 50/50! 🎲", "success");
                     }
                 }
             }
@@ -596,8 +621,6 @@ function activateFiftyFifty(correctIndex) {
 
         const hasBonus = playerBonus[currentPlayer]; 
         timeRemaining = hasBonus ? 20 : 15;
-        //bonusTime=false;
-
 
         updateTimerDisplay(timeRemaining);
         if (hasBonus) {
@@ -658,9 +681,14 @@ function activateFiftyFifty(correctIndex) {
             panel.setAttribute('data-player', idx.toString());
             panel.innerHTML = `
               <div class="mb-3 flex flex-col">
-                <h3 class="flex items-center gap-2 font-semibold text-gray-800">
-                  <span class="w-3 h-3 rounded-full ${idx===0?'bg-blue-500':'bg-green-500'}"></span> ${name}
-                </h3>
+                <div class="flex items-center gap-2">
+                  <img src="${playerAvatars[idx] || 'images/avatars/boy1.jpg'}"
+                       alt="Avatar"
+                       class="w-9 h-9 rounded-full border border-gray-300 shadow-sm" />
+                  <h3 class="flex items-center gap-2 font-semibold text-gray-800">
+                    <span class="w-3 h-3 rounded-full ${idx===0?'bg-blue-500':'bg-green-500'}"></span> ${name}
+                  </h3>
+                </div>
                 <span class="turn-badge hidden px-2 py-1 mt-1 rounded-full bg-green-500 text-white text-xs font-semibold">Your Turn! ⚡</span>
                 <p class="streak-line hidden text-xs text-orange-500 font-semibold mt-1">🔥 Streak: ${streaks[idx] || 0}</p>
               </div>
