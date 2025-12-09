@@ -117,6 +117,18 @@
     body.dark .streak-line {
         color: #fb923c !important;
     }
+
+    /* BONUS TIMER FLASH (rumeno utripanje) */
+@keyframes bonusFlash {
+    0% { background-color: #facc15; }   /* bright yellow */
+    50% { background-color: #fde047; }  /* lighter yellow */
+    100% { background-color: #facc15; }
+}
+
+.bonus-active {
+    animation: bonusFlash 0.8s infinite ease-in-out;
+}
+
     </style>
 </head>
 
@@ -239,7 +251,10 @@
     let currentPlayer = 0;
     let gameOver = false;
     let toastTimer = null;
-    let streaks = []; 
+
+    let streaks = []; // 🔥 streak по играч
+    let bonusTime = false;  
+
 
     let timerInterval;
     let timeRemaining = 15;  // Timer starts at 15 seconds
@@ -330,6 +345,12 @@
 
             if (isCorrectAnswer) {
                 streaks[pIdx] = (streaks[pIdx] || 0) + 1;
+                if (streaks[pIdx]===3) {
+                    bonusTime = true;
+                    streaks[pIdx] = 0;
+                    showToast("BONUS! +5 sekund ✔️", "success");
+                }
+
                 playCorrect();
                 button.classList.add("bg-green-500","text-white","border-green-500");
             } else {
@@ -381,9 +402,19 @@
             clearInterval(timerInterval);
         }
         if (gameOver) return;
-        timeRemaining = 15;
+        timeRemaining = bonusTime ? 20 : 15;
+        //bonusTime=false;
+
         updateTimerDisplay(timeRemaining);
+        if (bonusTime) {
+            timerDisplay.innerText = "⏱️ BONUS +5s 🎉";
+            progressBar.classList.add("bonus-active"); 
+        }
+        else{
+            progressBar.classList.remove("bonus-active");
+        }
         updateProgressBar(timeRemaining);
+        bonusTime=false;
 
         playBgMusic();
 
