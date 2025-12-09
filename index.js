@@ -1,7 +1,3 @@
-require('electron-reload')(__dirname, {
-  electron: require(`${__dirname}/node_modules/electron`)
-});
-
 require('dotenv').config();
 const {app, BrowserWindow, ipcMain} = require('electron/main');
 const path = require('node:path');
