@@ -253,7 +253,8 @@
     let toastTimer = null;
 
     let streaks = []; // 🔥 streak по играч
-    let bonusTime = false;  
+    let bonusTime = false; 
+    let playerBonus = []; // bonus za vsakega igralca 
 
 
     let timerInterval;
@@ -282,6 +283,8 @@
 
         // init streaks
         streaks = new Array(playerCount).fill(0);
+
+        playerBonus = new Array(playerCount).fill(false);
 
         console.log(parameters.players);
         game = await window.api.startGame(parameters.grade, parameters.category, playerIds);
@@ -346,9 +349,9 @@
             if (isCorrectAnswer) {
                 streaks[pIdx] = (streaks[pIdx] || 0) + 1;
                 if (streaks[pIdx]===3) {
-                    bonusTime = true;
+                    playerBonus[pIdx] = true;
                     streaks[pIdx] = 0;
-                    showToast("BONUS! +5 sekund ✔️", "success");
+                    showToast(playerNames[pIdx] + " je zaslužil BONUS +5s! 🎉", "success");
                 }
 
                 playCorrect();
@@ -402,11 +405,12 @@
             clearInterval(timerInterval);
         }
         if (gameOver) return;
-        timeRemaining = bonusTime ? 20 : 15;
+        const hasBonus = playerBonus[currentPlayer]; 
+        timeRemaining = hasBonus ? 20 : 15;
         //bonusTime=false;
 
         updateTimerDisplay(timeRemaining);
-        if (bonusTime) {
+        if (hasBonus) {
             timerDisplay.innerText = "⏱️ BONUS +5s 🎉";
             progressBar.classList.add("bonus-active"); 
         }
@@ -414,7 +418,7 @@
             progressBar.classList.remove("bonus-active");
         }
         updateProgressBar(timeRemaining);
-        bonusTime=false;
+        playerBonus[currentPlayer]=false;
 
         playBgMusic();
 
