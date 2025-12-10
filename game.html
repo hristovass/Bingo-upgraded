@@ -884,6 +884,22 @@
                     skipBtn.classList.add('opacity-60', 'cursor-not-allowed');
                 }
             }
+            /* ---------- ACHIEVEMENTS SHRANJEVANJE ---------- */
+            const ACHIEVEMENTS_KEY = 'quizAchievements';
+
+            function getAchievementsStore() {
+                const raw = localStorage.getItem(ACHIEVEMENTS_KEY);
+                if (!raw) return {};
+                try {
+                    return JSON.parse(raw);
+                } catch {
+                    return {};
+                }
+            }
+
+            function setAchievementsStore(store) {
+                localStorage.setItem(ACHIEVEMENTS_KEY, JSON.stringify(store));
+            }
 
             /* ---------- KONEC IGRE ---------- */
             function endGame(winnerIdx) {
@@ -891,16 +907,68 @@
                 clearInterval(timerInterval);
                 disableAnswerButtons();
                 highlightTurn(-1);
-                showWinnerModal(playerNames[winnerIdx]);
+                // ➜ posredujemo tudi index zmagovalca
+                showWinnerModal(playerNames[winnerIdx], winnerIdx);
                 updateSkipButton();
             }
 
-            function showWinnerModal(name) {
+            function showWinnerModal(name, winnerIdx) {
                 const modal = document.getElementById('winnerModal');
                 const title = document.getElementById('winnerName');
-                if (title) title.textContent = name + ' je zmagal! 🏆';
-                modal?.classList.remove('hidden');
+                const list = document.getElementById('winnerAchievements'); // UL v modalu
+
+                if (title) {
+                    title.textContent = name + ' je zmagal! 🏆';
+                }
+
+                // ---------- IZRAČUN DOSEŽKOV ZA ZMAGOVALCA ----------
+                const achievementsTexts = [];
+
+                // 🏅 Brez napak – vsaj 5 pravilnih zapored (lahko prilagodiš na 3, če želiš)
+                if ((streaks[winnerIdx] || 0) >= 5) {
+                    achievementsTexts.push('🏅 Brez napak – vsaj 5 pravilnih odgovorov zapored.');
+                }
+
+                // 💡 Brez jokerjev – brez preskokov in 50/50
+                if ((skipCounts[winnerIdx] || 0) === 0 && !fiftyUsedAlready[winnerIdx]) {
+                    achievementsTexts.push('💡 Brez jokerjev – brez preskokov in 50/50.');
+                }
+
+                // 🔥 Mirna roka – nikoli ni prišel do dolge serije napačnih (failStreak na koncu 0)
+                if ((failStreak[winnerIdx] || 0) === 0) {
+                    achievementsTexts.push('🔥 Mirna roka – brez dolge serije napačnih odgovorov.');
+                }
+
+                // --- prikažemo v modalu ---
+                if (list) {
+                    list.innerHTML = '';
+                    if (achievementsTexts.length === 0) {
+                        const li = document.createElement('li');
+                        li.textContent = 'Ni posebnih dosežkov, a zmaga je zmaga! 🎉';
+                        list.appendChild(li);
+                    } else {
+                        achievementsTexts.forEach(t => {
+                            const li = document.createElement('li');
+                            li.textContent = t;
+                            list.appendChild(li);
+                        });
+                    }
+                }
+
+                // --- shranimo dosežke za tega uporabnika v localStorage ---
+                const userId = playerIds[winnerIdx]; // imamo ga iz parameters.players
+                if (userId != null) {
+                    const store = getAchievementsStore();
+                    // shrani textualno listo; lahko bi tudi kode, ampak za nas je OK
+                    store[String(userId)] = achievementsTexts;
+                    setAchievementsStore(store);
+                }
+
+                if (modal) {
+                    modal.classList.remove('hidden');
+                }
             }
+
 
             /* ---------- TOAST ---------- */
             function showToast(message, type = 'info') {
@@ -978,6 +1046,12 @@
             <div class="bg-white rounded-2xl shadow-2xl p-8 w-[90%] max-w-md text-center space-y-4">
                 <h2 id="winnerName" class="text-2xl font-bold text-gray-800">Zmagovalec!</h2>
                 <p class="text-gray-600">Igra je končana. Čestitke!</p>
+                <div class="text-left text-sm text-gray-700 mt-2">
+                    <h3 class="font-semibold mb-1">Dosežki v tej igri:</h3>
+                    <ul id="winnerAchievements" class="list-disc list-inside space-y-1">
+                        <!-- JS bo tukaj dodal <li> elemente -->
+                    </ul>
+                </div>
                 <div class="flex gap-3 justify-center">
                     <button onclick="window.location.href='index.html'"
                         class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Nova igra</button>
