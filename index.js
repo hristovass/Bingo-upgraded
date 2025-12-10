@@ -266,6 +266,7 @@ ipcMain.handle('get-total-score', async (event, userId) => {
     } catch (err) {
         console.error('Total score error:', err);
         return { error: err.message };
+        
     }
 });
 
