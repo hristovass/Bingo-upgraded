@@ -530,10 +530,19 @@ async function enterData() {
         return;
     }
 
-    // osnovni subject (če nimamo nič bolj specifičnega)
-    statsSubject = 'Neznano';
+    // 🧹 ZAČETEK NOVE IGRE → pobrišemo staro statistiko
+    resetStats();
 
-    playerCount = parameters.players.length;
+    // 🔑 subject za statistiko:
+    // če je izbran NATANČNO 1 predmet, uporabimo njegov ID kot ključ
+    if (Array.isArray(parameters.category) && parameters.category.length === 1) {
+        statsSubject = String(parameters.category[0]);   // npr. "3" → v stats.html se prikaže kot ime predmeta
+    } else {
+        // več predmetov ali nič → vse gre pod "Neznano"
+        statsSubject = 'Neznano';
+    }
+
+    playerCount   = parameters.players.length;
     playerIds     = [];
     playerNames   = [];
     playerAvatars = [];
@@ -546,21 +555,21 @@ async function enterData() {
 
         const key = String(getPlayerKey(player));
         const savedAvatar = localStorage.getItem("avatar_" + key);
-        const avatarPath = savedAvatar ? `images/avatars/${savedAvatar}` : null;
+        const avatarPath  = savedAvatar ? `images/avatars/${savedAvatar}` : null;
         playerAvatars.push(avatarPath);
     }
 
-    streaks           = new Array(playerCount).fill(0);
-    skipCounts        = new Array(playerCount).fill(0);
-    failStreak        = new Array(playerCount).fill(0);
-    fiftyAvailable    = new Array(playerCount).fill(false);
-    fiftyUsedAlready  = new Array(playerCount).fill(false);
-    playerBonus       = new Array(playerCount).fill(false);
+    streaks          = new Array(playerCount).fill(0);
+    skipCounts       = new Array(playerCount).fill(0);
+    failStreak       = new Array(playerCount).fill(0);
+    fiftyAvailable   = new Array(playerCount).fill(false);
+    fiftyUsedAlready = new Array(playerCount).fill(false);
+    playerBonus      = new Array(playerCount).fill(false);
 
     console.log(parameters.players);
 
     // startGame pričakuje: grade, category (array ID-jev), playerIds
-    game = await window.api.startGame(parameters.grade, parameters.category, playerIds);
+    game     = await window.api.startGame(parameters.grade, parameters.category, playerIds);
     gameData = game.questions || [];
     boards   = (game.players || []).map(p => p.board);
 
@@ -645,11 +654,18 @@ async function selectedAnswer(event) {
         // subjectKey skušamo dobiti iz vprašanja, fallback statsSubject
         const q = gameData[questionIndex];
         const subjectKey =
-            (q && (q.category_name || q.category || q.subject_name || q.subject)) ||
-            statsSubject;
+             (q && (
+                 q.category_id ??      // če backend uporablja snake_case ID
+                 q.categoryId ??       // ali camelCase ID
+                 q.category ??
+                 q.category_name ??
+                 q.subject_name ??
+                 q.subject
+            )) || statsSubject;
 
-        // shranimo v statistiko
-        updateStats(subjectKey, isCorrectAnswer);
+          // shranimo v statistiko
+          updateStats(subjectKey, isCorrectAnswer);
+
 
         if (Array.isArray(result?.board)) {
             boards[pIdx] = result.board;

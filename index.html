@@ -452,6 +452,7 @@ async function loadCategories() {
     categories.forEach(cat => {
         const card = document.createElement("div");
         card.dataset.id = cat.id;
+        card.dataset.name = cat.name;
 
         const icon = subjectIcons[cat.name] || "📚";
 
@@ -613,17 +614,27 @@ startBtn.onclick = () => {
     if (startBtn.disabled) return;
 
     selected.category = [];
-    document.querySelectorAll("#category-cards .selected")
-        .forEach(c => selected.category.push(c.dataset.id));
+    const categoriesInfo = [];     // 👈 tu bomo shranili {id, name}
+
+    document
+      .querySelectorAll("#category-cards .selected")
+      .forEach(c => {
+          const id   = c.dataset.id;
+          const name = c.dataset.name;
+          selected.category.push(id);             // za backend
+          categoriesInfo.push({ id, name });      // za statistiko
+      });
 
     localStorage.setItem("parameters", JSON.stringify({
         grade: selected.grade,
-        category: selected.category,
+        category: selected.category,    // ID-ji za backend
+        categoriesInfo: categoriesInfo, // 👈 NOVO: ID + ime
         players: players
     }));
 
     window.location.href = "game.html";
 };
+
 </script>
 
 <script>
