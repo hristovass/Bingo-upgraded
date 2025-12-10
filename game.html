@@ -240,563 +240,637 @@
     <audio id="correctSound" src="./sounds/correct.mp3" preload="auto"></audio>
     <audio id="errorSound" src="./sounds/error.mp3" preload="auto"></audio>
 
-    <script>
-    (function initTheme() {
-        const theme = localStorage.getItem('theme') || 'light';
-        document.body.classList.toggle('dark', theme === 'dark');
-    })();
+<script>
+/* ---------- TEMA ---------- */
+(function initTheme() {
+    const theme = localStorage.getItem('theme') || 'light';
+    document.body.classList.toggle('dark', theme === 'dark');
+})();
 
-    function musicEnabled() {
-        return localStorage.getItem('music') !== 'off';
+/* ---------- AUDIO NASTAVITVE ---------- */
+function musicEnabled() {
+    return localStorage.getItem('music') !== 'off';
+}
+
+function sfxEnabled() {
+    return localStorage.getItem('sfx') !== 'off';
+}
+
+const bgMusic      = document.getElementById('bgMusic');
+const tickSound    = document.getElementById('tickSound');
+const correctSound = document.getElementById('correctSound');
+const errorSound   = document.getElementById('errorSound');
+
+function playBgMusic() {
+    if (!musicEnabled() || !bgMusic) return;
+    bgMusic.volume = 0.3;
+    bgMusic.play().catch(() => {});
+}
+
+function stopBgMusic() {
+    if (!bgMusic) return;
+    bgMusic.pause();
+    bgMusic.currentTime = 0;
+}
+
+function playTick() {
+    if (!sfxEnabled() || !tickSound) return;
+    tickSound.currentTime = 0;
+    tickSound.play().catch(() => {});
+}
+
+function playCorrect() {
+    if (!sfxEnabled() || !correctSound) return;
+    correctSound.currentTime = 0;
+    correctSound.play().catch(() => {});
+}
+
+function playerror() {
+    if (!sfxEnabled() || !errorSound) return;
+    errorSound.currentTime = 0;
+    errorSound.play().catch(() => {});
+}
+
+/* ---------- STATISTIKA (localStorage) ---------- */
+const STATS_KEY = 'quizBingoStats';
+
+function getStats() {
+    const raw = localStorage.getItem(STATS_KEY);
+    if (!raw) return {};
+    try {
+        return JSON.parse(raw);
+    } catch (e) {
+        console.error('Napaka pri branju statistike:', e);
+        return {};
+    }
+}
+
+function setStats(stats) {
+    localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+}
+
+/**
+ * subject = predmet / kategorija (npr. Matematika)
+ * isCorrect = true/false (ali je bil odgovor pravilen)
+ */
+function updateStats(subject, isCorrect) {
+    if (!subject) subject = 'Neznano';
+
+    const stats = getStats();
+
+    if (!stats[subject]) {
+        stats[subject] = { correct: 0, total: 0 };
     }
 
-    function sfxEnabled() {
-        return localStorage.getItem('sfx') !== 'off';
+    stats[subject].total++;
+    if (isCorrect) {
+        stats[subject].correct++;
     }
 
-    const bgMusic = document.getElementById('bgMusic');
-    const tickSound = document.getElementById('tickSound');
-    const correctSound = document.getElementById('correctSound');
-    const errorSound = document.getElementById('errorSound');
+    setStats(stats);
+}
 
-    function playBgMusic() {
-        if (!musicEnabled() || !bgMusic) return;
-        bgMusic.volume = 0.3;
-        bgMusic.play().catch(() => {});
+function resetStats() {
+    localStorage.removeItem(STATS_KEY);
+}
+
+/* ---------- GAME STATE ---------- */
+let game = [];
+let gameData = [];
+let parameters = {};
+let isCorrectAnswer = false;
+let statsSubject = 'Neznano';
+let questionIndex = -1;
+let limitIndex = 20;
+
+const questionImage = document.getElementById("questionImage");
+let playerIds      = [];
+let playerNames    = [];
+let playerAvatars  = []; // poti do avatarjev
+let playerCount    = 0;
+let boards         = [];
+let currentPlayer  = 0;
+let gameOver       = false;
+let toastTimer     = null;
+
+let streaks     = [];
+let playerBonus = [];
+
+let skipCounts = [];
+const maxSkipsPerPlayer = 2;
+
+let failStreak       = [];
+let fiftyAvailable   = [];
+let fiftyUsedAlready = [];
+
+let timerInterval;
+let timeRemaining = 15;
+
+const progressBar   = document.querySelector('.timerBar');
+const timerDisplay  = document.querySelector('.px-3.py-1.bg-gray-200');
+const skipBtn       = document.getElementById("skipBtn");
+const skipCounter   = document.getElementById("skipCounter");
+const fiftyBtn      = document.getElementById("fiftyBtn");
+const currentAvatar = document.getElementById("currentAvatar");
+
+/* ---------- SKIP GUMB ---------- */
+function updateSkipButton() {
+    if (!skipBtn || !skipCounter || playerCount === 0) return;
+
+    const pIdx = currentPlayer;
+    const used = skipCounts[pIdx] || 0;
+    const remaining = Math.max(0, maxSkipsPerPlayer - used);
+
+    skipCounter.textContent = remaining;
+
+    if (gameOver || remaining === 0) {
+        skipBtn.disabled = true;
+        skipBtn.classList.add("opacity-60","cursor-not-allowed");
+    } else {
+        skipBtn.disabled = false;
+        skipBtn.classList.remove("opacity-60","cursor-not-allowed");
+    }
+}
+
+function skipQuestion() {
+    if (gameOver || playerCount === 0) return;
+
+    const pIdx = currentPlayer;
+
+    if (skipCounts[pIdx] >= maxSkipsPerPlayer) {
+        showToast("Ta igralec nima več preskokov 🙃", "error");
+        updateSkipButton();
+        return;
     }
 
-    function stopBgMusic() {
-        if (!bgMusic) return;
-        bgMusic.pause();
-        bgMusic.currentTime = 0;
+    skipCounts[pIdx]++;
+    updateSkipButton();
+
+    if (timerInterval) {
+        clearInterval(timerInterval);
+    }
+    stopBgMusic();
+
+    showToast("Vprašanje preskočeno. Brez točk in brez kazni 🙂", "info");
+
+    play();
+}
+
+/* ---------- 50 / 50 ---------- */
+function updateFiftyButton() {
+    if (!fiftyBtn) return;
+    const pIdx = currentPlayer;
+
+    if (fiftyAvailable[pIdx]) {
+        fiftyBtn.classList.remove("hidden");
+    } else {
+        fiftyBtn.classList.add("hidden");
+    }
+}
+
+function resetAnswerButtons() {
+    const btns = [...document.getElementsByClassName("qButtons")];
+    btns.forEach(btn => {
+        btn.disabled = false;
+        btn.classList.remove("opacity-30");
+    });
+}
+
+function activateFiftyFifty(correctIndex) {
+    const btns = [...document.getElementsByClassName("qButtons")];
+    let wrongButtons = btns.filter(btn => parseInt(btn.id) !== correctIndex);
+    let toHide = wrongButtons.sort(() => 0.5 - Math.random()).slice(0, 2);
+
+    toHide.forEach(btn => {
+        btn.disabled = true;
+        btn.classList.add("opacity-30");
+    });
+}
+
+/* ---------- TIMER ---------- */
+function startTimer() {
+    if (timerInterval) {
+        clearInterval(timerInterval);
+    }
+    if (gameOver) return;
+
+    const hasBonus = playerBonus[currentPlayer];
+    timeRemaining = hasBonus ? 20 : 15;
+
+    updateTimerDisplay(timeRemaining);
+    if (hasBonus) {
+        timerDisplay.innerText = "⏱️ BONUS +5s 🎉";
+        progressBar.classList.add("bonus-active");
+    } else {
+        progressBar.classList.remove("bonus-active");
+    }
+    updateProgressBar(timeRemaining);
+    playerBonus[currentPlayer] = false;
+
+    playBgMusic();
+
+    timerInterval = setInterval(function() {
+        timeRemaining--;
+        updateTimerDisplay(timeRemaining);
+        updateProgressBar(timeRemaining);
+
+        playTick();
+
+        if (timeRemaining <= 0 && !gameOver) {
+            clearInterval(timerInterval);
+            stopBgMusic();
+            play();
+        }
+    }, 1000);
+}
+
+function updateTimerDisplay(time) {
+    timerDisplay.innerText = `⏱️ ${time}s`;
+}
+
+function updateProgressBar(time) {
+    if(time <= 10 && time > 5) {
+        progressBar.classList.add("bg-orange-500");
+        progressBar.classList.remove("bg-blue-500");
+    } else if(time <= 5) {
+        progressBar.classList.add("bg-rose-500");
+        progressBar.classList.remove("bg-orange-500");
+    } else {
+        progressBar.classList.add("bg-blue-500");
+        progressBar.classList.remove("bg-rose-500");
+    }
+    const percentage = (time / 15) * 100;
+    progressBar.style.width = `${percentage}%`;
+}
+
+/* ---------- POMOŽNE ---------- */
+function shuffle(array) {
+    let currentIndex = array.length;
+    while (currentIndex != 0) {
+        let randomIndex = Math.floor(Math.random() * currentIndex);
+        currentIndex--;
+        [array[currentIndex], array[randomIndex]] = [
+            array[randomIndex], array[currentIndex]
+        ];
+    }
+}
+
+/* ---------- PLAYER KEY (kot index.html) ---------- */
+function getPlayerKey(player) {
+    return player?.id ?? `${player.first_name}::${player.last_name}`;
+}
+
+/* ---------- NALAGANJE PODATKOV ---------- */
+async function enterData() {
+    console.log("Loading game data...");
+    parameters = JSON.parse(localStorage.getItem('parameters'));
+
+    if (!parameters) {
+        console.error("Ni parameters v localStorage");
+        return;
     }
 
-    function playTick() {
-        if (!sfxEnabled() || !tickSound) return;
-        tickSound.currentTime = 0;
-        tickSound.play().catch(() => {});
+    // osnovni subject (če nimamo nič bolj specifičnega)
+    statsSubject = 'Neznano';
+
+    playerCount = parameters.players.length;
+    playerIds     = [];
+    playerNames   = [];
+    playerAvatars = [];
+
+    for (let i = 0; i < playerCount; i++) {
+        const player = parameters.players[i];
+
+        playerIds.push(parseInt(player.id));
+        playerNames.push(`${player.first_name} ${player.last_name}`);
+
+        const key = String(getPlayerKey(player));
+        const savedAvatar = localStorage.getItem("avatar_" + key);
+        const avatarPath = savedAvatar ? `images/avatars/${savedAvatar}` : null;
+        playerAvatars.push(avatarPath);
     }
 
-    function playCorrect() {
-        if (!sfxEnabled() || !correctSound) return;
-        correctSound.currentTime = 0;
-        correctSound.play().catch(() => {});
+    streaks           = new Array(playerCount).fill(0);
+    skipCounts        = new Array(playerCount).fill(0);
+    failStreak        = new Array(playerCount).fill(0);
+    fiftyAvailable    = new Array(playerCount).fill(false);
+    fiftyUsedAlready  = new Array(playerCount).fill(false);
+    playerBonus       = new Array(playerCount).fill(false);
+
+    console.log(parameters.players);
+
+    // startGame pričakuje: grade, category (array ID-jev), playerIds
+    game = await window.api.startGame(parameters.grade, parameters.category, playerIds);
+    gameData = game.questions || [];
+    boards   = (game.players || []).map(p => p.board);
+
+    console.log(gameData);
+    shuffle(gameData);
+    console.log("Zmešano:", gameData);
+
+    limitIndex = gameData.length - 1;
+
+    renderBoards();
+    play();
+    startTimer();
+    updateSkipButton();
+}
+
+/* ---------- IZVEDBA ENEGA VPRAŠANJA ---------- */
+function play() {
+    if (gameOver) return;
+    if (!gameData || gameData.length === 0) return;
+
+    resetAnswerButtons();
+    questionIndex++;
+    if (questionIndex > limitIndex) {
+        questionIndex = 0;
     }
 
-    function playerror() {
-        if (!sfxEnabled() || !errorSound) return;
-        errorSound.currentTime = 0;
-        errorSound.play().catch(() => {});
+    const q = gameData[questionIndex];
+
+    if (q.image_path != null && q.image_path !== undefined) {
+        questionImage.classList.remove("hidden");
+        questionImage.src = "./images/" + q.image_path + ".png";
+    } else {
+        questionImage.classList.add("hidden");
     }
 
-    // ---- GAME STATE ----
-    let game = [];
-    let gameData = [];
-    let parameters = {};
-    let isCorrectAnswer = false;
-    let questionIndex = -1;
-    let limitIndex = 20;
-    let questionImage = document.getElementById("questionImage"); // ✅ точнота слика за прашање
-    let playerIds = [];
-    let playerNames = [];
-    let playerAvatars = []; // 👈 avatar на сите играчи (полн од localStorage)
-    let playerCount = 0;
-    let boards = [];
-    let currentPlayer = 0;
-    let gameOver = false;
-    let toastTimer = null;
+    currentPlayer = questionIndex % playerCount;
+    document.getElementById("turn").innerText =
+        playerNames[currentPlayer] + " je na vrsti";
+    highlightTurn(currentPlayer);
 
-    let streaks = []; 
-    let bonusTime = false; 
-    let playerBonus = []; 
-
-    // skip по играч
-    let skipCounts = [];       
-    const maxSkipsPerPlayer = 2;
-
-    let failStreak = [];   
-    let fiftyAvailable = [];
-    let fiftyUsedAlready = [];
-    
-
-    let timerInterval;
-    let timeRemaining = 15;  // Timer starts at 15 seconds
-    const progressBar = document.querySelector('.timerBar');
-    const timerDisplay = document.querySelector('.px-3.py-1.bg-gray-200');
-
-    const skipBtn = document.getElementById("skipBtn");
-    const skipCounter = document.getElementById("skipCounter");
-
-    function updateSkipButton() {
-        if (!skipBtn || !skipCounter || playerCount === 0) return;
-
-        const pIdx = currentPlayer;
-        const used = skipCounts[pIdx] || 0;
-        const remaining = Math.max(0, maxSkipsPerPlayer - used);
-
-        skipCounter.textContent = remaining;
-
-        if (gameOver || remaining === 0) {
-            skipBtn.disabled = true;
-            skipBtn.classList.add("opacity-60","cursor-not-allowed");
+    // avatar v headerju
+    if (currentAvatar) {
+        const src = playerAvatars[currentPlayer];
+        if (src) {
+            currentAvatar.src = src;
+            currentAvatar.classList.remove("hidden");
         } else {
-            skipBtn.disabled = false;
-            skipBtn.classList.remove("opacity-60","cursor-not-allowed");
+            currentAvatar.classList.add("hidden");
         }
     }
 
-    const buttons = document.getElementsByClassName("qButtons");
-    for (var i = 0; i < buttons.length; i++) {
-        buttons[i].addEventListener('click', selectedAnswer, false);
+    document.getElementById("question").innerText = q.text;
+    document.getElementById("0").innerText = q.options[0];
+    document.getElementById("1").innerText = q.options[1];
+    document.getElementById("2").innerText = q.options[2];
+    document.getElementById("3").innerText = q.options[3];
+
+    updateSkipButton();
+    startTimer();
+    updateFiftyButton();
+}
+
+/* ---------- ODGOVOR NA VPRAŠANJE ---------- */
+async function selectedAnswer(event) {
+    const button = event.target;
+    if (gameOver) return;
+
+    const allBtns = document.getElementsByClassName("qButtons");
+    Array.from(allBtns).forEach(b => b.disabled = true);
+
+    const pIdx = questionIndex % playerCount;
+    console.log(pIdx, gameData[questionIndex].id, parseInt(button.id));
+
+    try {
+        const result = await window.api.answer(
+            pIdx,
+            gameData[questionIndex].id,
+            parseInt(button.id)
+        );
+        isCorrectAnswer = !!result?.correct;
+
+        // subjectKey skušamo dobiti iz vprašanja, fallback statsSubject
+        const q = gameData[questionIndex];
+        const subjectKey =
+            (q && (q.category_name || q.category || q.subject_name || q.subject)) ||
+            statsSubject;
+
+        // shranimo v statistiko
+        updateStats(subjectKey, isCorrectAnswer);
+
+        if (Array.isArray(result?.board)) {
+            boards[pIdx] = result.board;
+            updateBoard(pIdx);
+        }
+
+        if (isCorrectAnswer) {
+            failStreak[pIdx] = 0;
+
+            streaks[pIdx] = (streaks[pIdx] || 0) + 1;
+            if (streaks[pIdx] === 3) {
+                playerBonus[pIdx] = true;
+                streaks[pIdx] = 0;
+                showToast(playerNames[pIdx] + " je zaslužil BONUS +5s! 🎉", "success");
+            }
+
+            playCorrect();
+            button.classList.add("bg-green-500", "text-white", "border-green-500");
+        } else {
+            streaks[pIdx] = 0;
+            failStreak[pIdx]++;
+
+            playerror();
+            button.classList.add("bg-red-500", "text-white", "border-red-500");
+
+            if (failStreak[pIdx] === 5) {
+                failStreak[pIdx] = 0;
+                if (!fiftyUsedAlready[pIdx]) {
+                    fiftyAvailable[pIdx] = true;
+                    fiftyUsedAlready[pIdx] = true;
+                    showToast(playerNames[pIdx] + " je dobil 50/50! 🎲", "success");
+                }
+            }
+        }
+
+        highlightTurn(pIdx);
+
+        if (result?.bingo) {
+            endGame(pIdx);
+        }
+    } catch (e) {
+        console.error('answer error', e);
+        isCorrectAnswer = false;
+        playerror();
     }
+
+    setTimeout(function () {
+        resetAnswerButtons();
+        Array.from(allBtns).forEach(b => {
+            b.classList.remove(
+                "bg-green-500", "text-white", "border-green-500",
+                "bg-red-500", "border-red-500",
+                "border-blue-500", "bg-blue-50", "shadow-md", "selected"
+            );
+            b.classList.add("border-gray-200", "bg-white");
+            b.style.animation = "";
+            b.disabled = false;
+        });
+
+        if (!gameOver) play();
+    }, 700);
+}
+
+/* ---------- BOARDI ---------- */
+function renderBoards(){
+    const container = document.getElementById('boards');
+    container.innerHTML = '';
+    const cols = Math.max(1, Math.min(playerNames.length, 4));
+    container.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+    playerNames.forEach((name, idx) => {
+        const panel = document.createElement('div');
+        panel.className = 'w-full max-w-[420px] p-4 rounded-2xl bg-white shadow-md transition-all';
+        panel.setAttribute('data-player', idx.toString());
+        panel.innerHTML = `
+          <div class="mb-3 flex flex-col">
+            <div class="flex items-center gap-2">
+              <img src="${playerAvatars[idx] || 'images/avatars/boy1.jpg'}"
+                   alt="Avatar"
+                   class="w-9 h-9 rounded-full border border-gray-300 shadow-sm" />
+              <h3 class="flex items-center gap-2 font-semibold text-gray-800">
+                <span class="w-3 h-3 rounded-full ${idx===0?'bg-blue-500':'bg-green-500'}"></span> ${name}
+              </h3>
+            </div>
+            <span class="turn-badge hidden px-2 py-1 mt-1 rounded-full bg-green-500 text-white text-xs font-semibold">Your Turn! ⚡</span>
+            <p class="streak-line hidden text-xs text-orange-500 font-semibold mt-1">🔥 Streak: ${streaks[idx] || 0}</p>
+          </div>
+          <div class="grid grid-cols-5 gap-2 board-grid"></div>`;
+        container.appendChild(panel);
+        drawBoardCells(panel.querySelector('.board-grid'), boards[idx] || createEmptyBoard());
+    });
+    highlightTurn(currentPlayer);
+}
+
+function createEmptyBoard(){
+    const b = Array.from({length:5},()=>Array(5).fill(false));
+    b[2][2]=true; // free center
+    return b;
+}
+
+function drawBoardCells(gridEl, board){
+    gridEl.innerHTML = '';
+    let n=1;
+    for(let r=0;r<5;r++){
+        for(let c=0;c<5;c++){
+            const selected = board?.[r]?.[c];
+            const isCenter = r===2 && c===2;
+            const cell = document.createElement('div');
+            cell.className = `aspect-square rounded-lg flex items-center justify-center ${selected ? (isCenter ? 'bg-yellow-400 text-white' : 'bg-blue-500 text-white shadow') : 'bg-white border-2 border-gray-200'}`;
+            cell.textContent = isCenter ? '★' : String(n);
+            gridEl.appendChild(cell);
+            n++;
+        }
+    }
+}
+
+function updateBoard(playerIdx){
+    const grid = document.querySelector(`[data-player="${playerIdx}"] .board-grid`);
+    if (grid) drawBoardCells(grid, boards[playerIdx]);
+}
+
+function highlightTurn(playerIdx){
+    document.querySelectorAll('#boards > div').forEach((panel, idx) => {
+        const badge = panel.querySelector('.turn-badge');
+        const streakLine = panel.querySelector('.streak-line');
+
+        if (!gameOver && idx === playerIdx){
+            panel.classList.add('ring-4','ring-blue-500','scale-105');
+            badge?.classList.remove('hidden');
+
+            if (streakLine) {
+                streakLine.textContent = "🔥 Streak: " + (streaks[idx] || 0);
+                streakLine.classList.remove('hidden');
+            }
+        } else {
+            panel.classList.remove('ring-4','ring-blue-500','scale-105');
+            badge?.classList.add('hidden');
+            if (streakLine) {
+                streakLine.classList.add('hidden');
+            }
+        }
+    });
+}
+
+function disableAnswerButtons(){
+    Array.from(document.getElementsByClassName('qButtons')).forEach(btn => {
+        btn.disabled = true;
+        btn.classList.add('opacity-60','cursor-not-allowed');
+    });
 
     if (skipBtn) {
-        skipBtn.addEventListener("click", skipQuestion);
+        skipBtn.disabled = true;
+        skipBtn.classList.add('opacity-60','cursor-not-allowed');
     }
+}
 
-    const fiftyBtn = document.getElementById("fiftyBtn");
-    if (fiftyBtn) {
-        fiftyBtn.addEventListener("click", function () {
-            const pIdx = currentPlayer;
-            if (!fiftyAvailable[pIdx]) return;
+/* ---------- KONEC IGRE ---------- */
+function endGame(winnerIdx){
+    gameOver = true;
+    clearInterval(timerInterval);
+    disableAnswerButtons();
+    highlightTurn(-1);
+    showWinnerModal(playerNames[winnerIdx]);
+    updateSkipButton();
+}
 
-            const correctIndex = gameData[questionIndex].correct_answer;
-            activateFiftyFifty(correctIndex);
+function showWinnerModal(name){
+    const modal = document.getElementById('winnerModal');
+    const title = document.getElementById('winnerName');
+    if (title) title.textContent = name + ' je zmagal! 🏆';
+    modal?.classList.remove('hidden');
+}
 
-            fiftyAvailable[pIdx] = false; 
-            updateFiftyButton();
-
-            showToast("Uporabljen 50/50! 🎲", "success");
-        });
+/* ---------- TOAST ---------- */
+function showToast(message, type='info'){
+    const toast = document.getElementById('toast');
+    const text  = document.getElementById('toastMessage');
+    if (!toast || !text) return;
+    text.textContent = message;
+    toast.classList.remove('hidden');
+    toast.classList.remove('border-green-300','bg-green-50','border-rose-300','bg-rose-50');
+    if (type === 'success') {
+        toast.classList.add('border-green-300','bg-green-50');
+    } else if (type === 'error') {
+        toast.classList.add('border-rose-300','bg-rose-50');
     }
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+        toast.classList.add('hidden');
+    }, 1850);
+}
 
-    function skipQuestion() {
-        if (gameOver || playerCount === 0) return;
+/* ---------- LISTENERJI ---------- */
+const answerButtons = document.getElementsByClassName("qButtons");
+for (let i = 0; i < answerButtons.length; i++) {
+    answerButtons[i].addEventListener('click', selectedAnswer, false);
+}
 
+if (skipBtn) {
+    skipBtn.addEventListener("click", skipQuestion);
+}
+
+if (fiftyBtn) {
+    fiftyBtn.addEventListener("click", function () {
         const pIdx = currentPlayer;
-        
-        if (skipCounts[pIdx] >= maxSkipsPerPlayer) {
-            showToast("Ta igralec nima več preskokov 🙃", "error");
-            updateSkipButton();
-            return;
-        }
+        if (!fiftyAvailable[pIdx]) return;
 
-        skipCounts[pIdx]++;
-        updateSkipButton();
+        const correctIndex = gameData[questionIndex].correct_answer;
+        activateFiftyFifty(correctIndex);
 
-        if (timerInterval) {
-            clearInterval(timerInterval);
-        }
-        stopBgMusic();
-    
-        showToast("Vprašanje preskočeno. Brez točk in brez kazni 🙂", "info");
-
-        play();
-    }
-
-    window.onload = function() {
-        enterData();
-    };
-
-    // истата логика за key како во index.html
-    function getPlayerKey(player) {
-        return player?.id ?? `${player.first_name}::${player.last_name}`;
-    }
-
-    async function enterData(){
-        console.log("Loading game data...");
-        parameters = JSON.parse(localStorage.getItem('parameters'));
-        playerCount = parameters.players.length;
-
-        for(let i = 0; i < playerCount; i++){
-            const player = parameters.players[i];
-
-            playerIds.push(parseInt(player.id));
-            playerNames.push(`${player.first_name} ${player.last_name}`);
-
-            const key = String(getPlayerKey(player));
-            const savedAvatar = localStorage.getItem("avatar_" + key);
-
-            const avatarPath = savedAvatar
-                ? `images/avatars/${savedAvatar}`
-                : "images/avatars/boy1.jpg"; // default ако нема
-
-            playerAvatars.push(avatarPath);
-        }
-
-        streaks = new Array(playerCount).fill(0);
-        skipCounts = new Array(playerCount).fill(0);
-
-        failStreak = new Array(playerCount).fill(0);
-        fiftyAvailable = new Array(playerCount).fill(false);
-        fiftyUsedAlready = new Array(playerCount).fill(false);
-
-        playerBonus = new Array(playerCount).fill(false);
-
-        console.log(parameters.players);
-        game = await window.api.startGame(parameters.grade, parameters.category, playerIds);
-        gameData = game.questions || [];
-
-        boards = (game.players || []).map(p => p.board);
-        console.log(gameData);
-        await (shuffle(gameData));
-        console.log("Zmesano: ", gameData);
-        limitIndex = gameData.length - 1;
-        renderBoards();
-        play();
-        startTimer();
-        updateSkipButton();
-    }
-
-    function play(){
-        if (gameOver) return;
-        resetAnswerButtons();
-        questionIndex++;
-        if(questionIndex > limitIndex){
-            questionIndex = 0;
-        }
-
-        if(gameData[questionIndex].image_path != undefined){
-            questionImage.classList.remove("hidden");
-            questionImage.src = "./images/" + gameData[questionIndex].image_path + ".png";
-        } else {
-            questionImage.classList.add("hidden");
-        }
-
-        currentPlayer = questionIndex % playerCount;
-        document.getElementById("turn").innerText = playerNames[currentPlayer] + " je na vrsti";
-        highlightTurn(currentPlayer);
-
-        // 🔥 освежи avatar за тековниот играч
-        const avatarImg = document.getElementById("currentAvatar");
-        if (avatarImg) {
-            const src = playerAvatars[currentPlayer];
-            if (src) {
-                avatarImg.src = src;
-                avatarImg.classList.remove("hidden");
-            } else {
-                avatarImg.classList.add("hidden");
-            }
-        }
-
-        document.getElementById("question").innerText = gameData[questionIndex].text;
-        document.getElementById("0").innerText = gameData[questionIndex].options[0];
-        document.getElementById("1").innerText = gameData[questionIndex].options[1];
-        document.getElementById("2").innerText = gameData[questionIndex].options[2];
-        document.getElementById("3").innerText = gameData[questionIndex].options[3];
-        updateSkipButton();
-        startTimer();
+        fiftyAvailable[pIdx] = false;
         updateFiftyButton();
-    }
 
-    function updateFiftyButton() {
-        const pIdx = currentPlayer;
-        const btn = document.getElementById("fiftyBtn");
+        showToast("Uporabljen 50/50! 🎲", "success");
+    });
+}
 
-        if (!btn) return;
-
-        if (fiftyAvailable[pIdx]) {
-            btn.classList.remove("hidden");
-        } else {
-            btn.classList.add("hidden");
-        }
-    }
-
-    function resetAnswerButtons() {
-        const buttons = [...document.getElementsByClassName("qButtons")];
-        buttons.forEach(btn => {
-            btn.disabled = false;
-            btn.classList.remove("opacity-30");
-        });
-    }
-
-    function activateFiftyFifty(correctIndex) {
-        const buttons = [...document.getElementsByClassName("qButtons")];
-        let wrongButtons = buttons.filter(btn => parseInt(btn.id) !== correctIndex);
-        let toHide = wrongButtons.sort(() => 0.5 - Math.random()).slice(0, 2);
-
-        toHide.forEach(btn => {
-            btn.disabled = true;
-            btn.classList.add("opacity-30");
-        });
-    }
-
-    async function selectedAnswer(event){
-        const button = event.target;
-        if (gameOver) return;
-
-        const allBtns = document.getElementsByClassName("qButtons");
-        Array.from(allBtns).forEach(b => b.disabled = true);
-
-        const pIdx = questionIndex % playerCount;
-        console.log(pIdx, gameData[questionIndex].id, parseInt(button.id));
-
-        try {
-            const result = await window.api.answer(
-                pIdx,
-                gameData[questionIndex].id,
-                parseInt(button.id)
-            );
-            isCorrectAnswer = !!result?.correct;
-
-            if (Array.isArray(result?.board)) {
-                boards[pIdx] = result.board;
-                updateBoard(pIdx);
-            }
-
-            if (isCorrectAnswer) {
-
-                failStreak[pIdx] = 0;
-
-                streaks[pIdx] = (streaks[pIdx] || 0) + 1;
-                if (streaks[pIdx]===3) {
-                    playerBonus[pIdx] = true;
-                    streaks[pIdx] = 0;
-                    showToast(playerNames[pIdx] + " je zaslužil BONUS +5s! 🎉", "success");
-                }
-
-                playCorrect();
-                button.classList.add("bg-green-500","text-white","border-green-500");
-            } else {
-                streaks[pIdx] = 0;
-                failStreak[pIdx]++;
-
-                playerror();
-                button.classList.add("bg-red-500","text-white","border-red-500");
-
-                if (failStreak[pIdx] === 5){
-                    failStreak[pIdx] = 0;
-                    if (!fiftyUsedAlready[pIdx]){
-                        fiftyAvailable[pIdx] = true;
-                        fiftyUsedAlready[pIdx] = true;
-                        showToast(playerNames[pIdx] + " je dobil 50/50! 🎲", "success");
-                    }
-                }
-            }
-
-            highlightTurn(pIdx);
-
-            if (result?.bingo) {
-                endGame(pIdx);
-            }
-        } catch (e) {
-            console.error('answer error', e);
-            isCorrectAnswer = false;
-            playerror();
-        }
-
-        setTimeout(function (){
-            resetAnswerButtons();
-            Array.from(allBtns).forEach(b => {
-                b.classList.remove(
-                    "bg-green-500","text-white","border-green-500",
-                    "bg-red-500","border-red-500",
-                    "border-blue-500","bg-blue-50","shadow-md","selected"
-                );
-                b.classList.add("border-gray-200","bg-white");
-                b.style.animation = "";
-                b.disabled = false;
-            });
-
-            if (!gameOver) play();
-        }, 700);
-    }
-
-    function shuffle(array) {
-        let currentIndex = array.length;
-        while (currentIndex != 0) {
-            let randomIndex = Math.floor(Math.random() * currentIndex);
-            currentIndex--;
-            [array[currentIndex], array[randomIndex]] = [
-                array[randomIndex], array[currentIndex]
-            ];
-        }
-    }
-
-    function startTimer() {
-        if (timerInterval) {
-            clearInterval(timerInterval);
-        }
-        if (gameOver) return;
-
-        const hasBonus = playerBonus[currentPlayer]; 
-        timeRemaining = hasBonus ? 20 : 15;
-
-        updateTimerDisplay(timeRemaining);
-        if (hasBonus) {
-            timerDisplay.innerText = "⏱️ BONUS +5s 🎉";
-            progressBar.classList.add("bonus-active"); 
-        }
-        else{
-            progressBar.classList.remove("bonus-active");
-        }
-        updateProgressBar(timeRemaining);
-        playerBonus[currentPlayer]=false;
-
-        playBgMusic();
-
-        timerInterval = setInterval(function() {
-            timeRemaining--;
-            updateTimerDisplay(timeRemaining);
-            updateProgressBar(timeRemaining);
-
-            playTick();
-
-            if (timeRemaining <= 0 && !gameOver) {
-                clearInterval(timerInterval);
-                stopBgMusic();
-                play();
-            }
-        }, 1000);
-    }
-
-    function updateTimerDisplay(time) {
-        timerDisplay.innerText = `⏱️ ${time}s`;
-    }
-
-    function updateProgressBar(time) {
-        if(time <= 10 && time > 5) {
-            progressBar.classList.add("bg-orange-500");
-            progressBar.classList.remove("bg-blue-500");
-        } else if(time <= 5) {
-            progressBar.classList.add("bg-rose-500");
-            progressBar.classList.remove("bg-orange-500");
-        } else {
-            progressBar.classList.add("bg-blue-500");
-            progressBar.classList.remove("bg-rose-500");
-        }
-        const percentage = (time / 15) * 100;
-        progressBar.style.width = `${percentage}%`;
-    }
-
-    // --------- Boards rendering ----------
-    function renderBoards(){
-        const container = document.getElementById('boards');
-        container.innerHTML = '';
-        const cols = Math.max(1, Math.min(playerNames.length, 4));
-        container.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
-        playerNames.forEach((name, idx) => {
-            const panel = document.createElement('div');
-            panel.className = 'w-full max-w-[420px] p-4 rounded-2xl bg-white shadow-md transition-all';
-            panel.setAttribute('data-player', idx.toString());
-            panel.innerHTML = `
-              <div class="mb-3 flex flex-col">
-                <div class="flex items-center gap-2">
-                  <img src="${playerAvatars[idx] || 'images/avatars/boy1.jpg'}"
-                       alt="Avatar"
-                       class="w-9 h-9 rounded-full border border-gray-300 shadow-sm" />
-                  <h3 class="flex items-center gap-2 font-semibold text-gray-800">
-                    <span class="w-3 h-3 rounded-full ${idx===0?'bg-blue-500':'bg-green-500'}"></span> ${name}
-                  </h3>
-                </div>
-                <span class="turn-badge hidden px-2 py-1 mt-1 rounded-full bg-green-500 text-white text-xs font-semibold">Your Turn! ⚡</span>
-                <p class="streak-line hidden text-xs text-orange-500 font-semibold mt-1">🔥 Streak: ${streaks[idx] || 0}</p>
-              </div>
-              <div class="grid grid-cols-5 gap-2 board-grid"></div>`;
-            container.appendChild(panel);
-            drawBoardCells(panel.querySelector('.board-grid'), boards[idx] || createEmptyBoard());
-        });
-        highlightTurn(currentPlayer);
-    }
-
-    function createEmptyBoard(){
-        const b = Array.from({length:5},()=>Array(5).fill(false));
-        b[2][2]=true; // free center
-        return b;
-    }
-
-    function drawBoardCells(gridEl, board){
-        gridEl.innerHTML = '';
-        let n=1;
-        for(let r=0;r<5;r++){
-            for(let c=0;c<5;c++){
-                const selected = board?.[r]?.[c];
-                const isCenter = r===2 && c===2;
-                const cell = document.createElement('div');
-                cell.className = `aspect-square rounded-lg flex items-center justify-center ${selected ? (isCenter ? 'bg-yellow-400 text-white' : 'bg-blue-500 text-white shadow') : 'bg-white border-2 border-gray-200'}`;
-                cell.textContent = isCenter ? '★' : String(n);
-                gridEl.appendChild(cell);
-                n++;
-            }
-        }
-    }
-
-    function updateBoard(playerIdx){
-        const grid = document.querySelector(`[data-player="${playerIdx}"] .board-grid`);
-        if (grid) drawBoardCells(grid, boards[playerIdx]);
-    }
-
-    function highlightTurn(playerIdx){
-        document.querySelectorAll('#boards > div').forEach((panel, idx) => {
-            const badge = panel.querySelector('.turn-badge');
-            const streakLine = panel.querySelector('.streak-line');
-
-            if (!gameOver && idx === playerIdx){
-                panel.classList.add('ring-4','ring-blue-500','scale-105');
-                badge?.classList.remove('hidden');
-
-                if (streakLine) {
-                    streakLine.textContent = "🔥 Streak: " + (streaks[idx] || 0);
-                    streakLine.classList.remove('hidden');
-                }
-            } else {
-                panel.classList.remove('ring-4','ring-blue-500','scale-105');
-                badge?.classList.add('hidden');
-                if (streakLine) {
-                    streakLine.classList.add('hidden');
-                }
-            }
-        });
-    }
-
-    function disableAnswerButtons(){
-        Array.from(document.getElementsByClassName('qButtons')).forEach(btn => {
-            btn.disabled = true;
-            btn.classList.add('opacity-60','cursor-not-allowed');
-        });
-
-        if (skipBtn) {
-            skipBtn.disabled = true;
-            skipBtn.classList.add('opacity-60','cursor-not-allowed');
-        }
-    }
-
-    function endGame(winnerIdx){
-        gameOver = true;
-        clearInterval(timerInterval);
-        disableAnswerButtons();
-        highlightTurn(-1);
-        showWinnerModal(playerNames[winnerIdx]);
-        updateSkipButton();
-    }
-
-    function showWinnerModal(name){
-        const modal = document.getElementById('winnerModal');
-        const title = document.getElementById('winnerName');
-        if (title) title.textContent = name + ' je zmagal! 🏆';
-        modal?.classList.remove('hidden');
-    }
-
-    // --- Toast notifications ---
-    function showToast(message, type='info'){
-        const toast = document.getElementById('toast');
-        const text = document.getElementById('toastMessage');
-        if (!toast || !text) return;
-        text.textContent = message;
-        toast.classList.remove('hidden');
-        toast.classList.remove('border-green-300','bg-green-50','border-rose-300','bg-rose-50');
-        if (type === 'success') {
-            toast.classList.add('border-green-300','bg-green-50');
-        } else if (type === 'error') {
-            toast.classList.add('border-rose-300','bg-rose-50');
-        }
-        if (toastTimer) clearTimeout(toastTimer);
-        toastTimer = setTimeout(() => {
-            toast.classList.add('hidden');
-        }, 1850);
-    }
-    </script>
-
+/* ---------- START ---------- */
+window.onload = function() {
+    enterData();
+};
+</script>
     <!-- Winner Modal -->
     <div id="winnerModal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
       <div class="bg-white rounded-2xl shadow-2xl p-8 w-[90%] max-w-md text-center space-y-4">
