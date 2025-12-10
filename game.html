@@ -354,7 +354,8 @@ if (fiftyBtn) {
         const pIdx = currentPlayer;
         if (!fiftyAvailable[pIdx]) return;
 
-        const correctIndex = gameData[questionIndex].correct_answer;
+        const correctIndex = Number(gameData[questionIndex].correct_answer);
+        //const correctIndex = gameData[questionIndex].correct_answer;
 
 
         activateFiftyFifty(correctIndex);
@@ -484,7 +485,7 @@ function resetAnswerButtons() {
 }
 
 
-function activateFiftyFifty(correctIndex) {
+/*function activateFiftyFifty(correctIndex) {
     const buttons = [...document.getElementsByClassName("qButtons")];
     let wrongButtons = buttons.filter(btn => parseInt(btn.id) !== correctIndex);
     let toHide = wrongButtons.sort(() => 0.5 - Math.random()).slice(0, 2);
@@ -493,7 +494,34 @@ function activateFiftyFifty(correctIndex) {
         btn.disabled = true;
         btn.classList.add("opacity-30");
     });
+}*/
+function activateFiftyFifty(correctIndex) {
+    const buttons = [...document.getElementsByClassName("qButtons")];
+
+    // Vedno spremeni correctIndex v ŠTEVILKO
+    const correct = Number(correctIndex);
+
+    const correctBtn = buttons.find(btn => Number(btn.id) === correct);
+
+    // Filtriraj napačne gumbe
+    let wrongButtons = buttons.filter(btn => Number(btn.id) !== correct);
+
+    // Izberi dva napačna gumba za skritje
+    let toHide = wrongButtons.sort(() => 0.5 - Math.random()).slice(0, 2);
+
+    // Skrij samo napačne
+    toHide.forEach(btn => {
+        btn.disabled = true;
+        btn.classList.add("opacity-30");
+    });
+
+    // 🔒 PRAVILNI GUMB SE NIKOLI NE SME SKRITI
+    if (correctBtn) {
+        correctBtn.disabled = false;
+        correctBtn.classList.remove("opacity-30");
+    }
 }
+
 
 
     async function selectedAnswer(event){
